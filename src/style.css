@@ -115,6 +115,13 @@
 }
 
 /* ── Code area ── */
+/* Qlik Sense sets `* { user-select: none }` globally — override for code */
+.qvs-code,
+.qvs-code * {
+    user-select: text;
+    cursor: text;
+}
+
 .qvs-code {
     flex: 1 1 auto;
     margin: 0;
@@ -160,4 +167,80 @@
 
 .qvs-placeholder-text {
     font-size: 14px;
+}
+
+/* ── Search bar ── */
+.qvs-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    flex-shrink: 0;
+}
+
+.qvs-search-input {
+    width: 160px;
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    outline: none;
+    user-select: text;
+    cursor: text;
+}
+
+.qvs-search-input:focus {
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 1px rgba(74, 144, 217, 0.3);
+}
+
+.qvs-search-count {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    color: #888;
+    white-space: nowrap;
+    min-width: 50px;
+    text-align: center;
+}
+
+.qvs-search-prev,
+.qvs-search-next,
+.qvs-search-close {
+    padding: 2px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #fff;
+    font-size: 10px;
+    color: #555;
+    cursor: pointer;
+    line-height: 1;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+
+.qvs-search-prev:hover,
+.qvs-search-next:hover,
+.qvs-search-close:hover {
+    background: #e8e8e8;
+    color: #333;
+}
+
+.qvs-search-prev:disabled,
+.qvs-search-next:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* ── Search match highlights ── */
+.qvs-match {
+    background: rgba(255, 213, 0, 0.4);
+    border-radius: 1px;
+}
+
+.qvs-match-active {
+    background: rgba(255, 150, 0, 0.6);
+    outline: 2px solid #ff9600;
+    border-radius: 1px;
 }

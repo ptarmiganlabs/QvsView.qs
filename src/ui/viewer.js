@@ -9,6 +9,7 @@
 import { tokenize, renderTokensToHTML } from '../syntax/highlighter.js';
 import { buildTokenCSS } from '../syntax/tokens.js';
 import { parseSections } from '../sections.js';
+import { buildSearchBar, findMatchOffsets, highlightMatches, scrollToMatch } from './search.js';
 
 const CSS_PREFIX = 'qvs';
 
@@ -119,11 +120,28 @@ function renderSection(element, opts) {
     const sectionScript = section.content;
 
     const tokenizedLines = tokenize(sectionScript);
-    const codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
+    let codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
     const lineCount = tokenizedLines.length;
     const lineOffset = section.startLine + (sections.length > 1 ? 1 : 0); // offset for ///$tab line
 
     const wrapClass = wordWrap ? `${CSS_PREFIX}-wrap` : '';
+
+    // ── Search highlight injection ──
+    const searchQuery = element.dataset.qvsSearchQuery || '';
+    const searchActive = element.dataset.qvsSearchOpen === '1';
+    let matches = [];
+    let activeMatchIndex = 0;
+
+    if (searchActive && searchQuery) {
+        matches = findMatchOffsets(sectionScript, searchQuery);
+        const prevMatch = parseInt(element.dataset.qvsSearchMatch || '0', 10);
+        activeMatchIndex = matches.length > 0 ? prevMatch % matches.length : 0;
+        element.dataset.qvsSearchMatch = String(activeMatchIndex);
+
+        if (matches.length > 0) {
+            codeHTML = highlightMatches(codeHTML, sectionScript, matches, activeMatchIndex);
+        }
+    }
 
     // Build line numbers gutter (use global line numbers)
     let gutterHTML = '';
@@ -135,9 +153,10 @@ function renderSection(element, opts) {
     element.dataset.qvsActiveSection = String(activeIndex);
 
     element.innerHTML = `
-        <div class="${CSS_PREFIX}-container">
+        <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
                 ${buildTabBar(sections, activeIndex)}
+                ${searchActive ? buildSearchBar(searchQuery, activeMatchIndex, matches.length) : ''}
                 ${buildToolbar()}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
@@ -147,6 +166,12 @@ function renderSection(element, opts) {
         </div>
     `;
 
+    // Scroll to active match after render
+    if (searchActive && matches.length > 0) {
+        const viewer = element.querySelector(`.${CSS_PREFIX}-viewer`);
+        if (viewer) scrollToMatch(viewer, activeMatchIndex);
+    }
+
     // ── Attach event listeners ──
 
     // Tab click handler
@@ -154,6 +179,8 @@ function renderSection(element, opts) {
         btn.addEventListener('click', (e) => {
             const idx = parseInt(e.currentTarget.dataset.sectionIndex, 10);
             if (idx === activeIndex) return;
+            // Reset match index when switching tabs
+            element.dataset.qvsSearchMatch = '0';
             renderSection(element, { ...opts, activeIndex: idx });
         });
     });
@@ -175,6 +202,104 @@ function renderSection(element, opts) {
             );
         });
     }
+
+    // ── Search event listeners ──
+    const container = element.querySelector(`.${CSS_PREFIX}-container`);
+
+    // Keyboard shortcut: Ctrl/Cmd+F to open search
+    if (container) {
+        container.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                e.stopPropagation();
+                element.dataset.qvsSearchOpen = '1';
+                renderSection(element, opts);
+                const input = element.querySelector(`.${CSS_PREFIX}-search-input`);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }
+        });
+    }
+
+    // Search input and button handlers (only when search bar is visible)
+    const searchInput = element.querySelector(`.${CSS_PREFIX}-search-input`);
+    if (searchInput) {
+        // Focus the input on initial open
+        searchInput.focus();
+
+        // Live search on input
+        searchInput.addEventListener('input', (e) => {
+            element.dataset.qvsSearchQuery = e.target.value;
+            element.dataset.qvsSearchMatch = '0';
+            renderSection(element, opts);
+        });
+
+        // Enter = next, Shift+Enter = prev, Escape = close
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const dir = e.shiftKey ? -1 : 1;
+                navigateMatch(element, opts, dir);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeSearch(element, opts);
+            }
+        });
+
+        // Prev / Next buttons
+        const prevBtn = element.querySelector(`.${CSS_PREFIX}-search-prev`);
+        const nextBtn = element.querySelector(`.${CSS_PREFIX}-search-next`);
+        if (prevBtn) prevBtn.addEventListener('click', () => navigateMatch(element, opts, -1));
+        if (nextBtn) nextBtn.addEventListener('click', () => navigateMatch(element, opts, 1));
+
+        // Close button
+        const closeBtn = element.querySelector(`.${CSS_PREFIX}-search-close`);
+        if (closeBtn) closeBtn.addEventListener('click', () => closeSearch(element, opts));
+    }
+}
+
+/**
+ * Navigate to the next or previous search match.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {object} opts - Current render options (passed to renderSection).
+ * @param {number} direction - +1 for next, -1 for previous.
+ *
+ * @returns {void}
+ */
+function navigateMatch(element, opts, direction) {
+    const query = element.dataset.qvsSearchQuery || '';
+    if (!query) return;
+
+    const section = opts.sections[opts.activeIndex];
+    const total = findMatchOffsets(section.content, query).length;
+    if (total === 0) return;
+
+    const current = parseInt(element.dataset.qvsSearchMatch || '0', 10);
+    const next = (current + direction + total) % total;
+    element.dataset.qvsSearchMatch = String(next);
+    renderSection(element, opts);
+}
+
+/**
+ * Close the search bar and clear highlights.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {object} opts - Current render options (passed to renderSection).
+ *
+ * @returns {void}
+ */
+function closeSearch(element, opts) {
+    element.dataset.qvsSearchOpen = '0';
+    element.dataset.qvsSearchQuery = '';
+    element.dataset.qvsSearchMatch = '0';
+    renderSection(element, opts);
+
+    // Return focus to the container for future keyboard shortcuts
+    const container = element.querySelector(`.${CSS_PREFIX}-container`);
+    if (container) container.focus();
 }
 
 /**
