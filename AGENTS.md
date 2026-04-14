@@ -76,6 +76,7 @@ QvsView.qs/
 - No runtime dependencies — extension is self-contained
 - Font/size props use `type: 'number'` via dropdown
 - Keywords are case-insensitive in Qlik script
+- **Extension upload**: You cannot upload the extension zip to Qlik Sense yourself. After building, tell the user the zip is ready and wait for them to confirm the upload is done before testing.
 
 ## Quality Gates (required before commit)
 

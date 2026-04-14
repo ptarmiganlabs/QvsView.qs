@@ -9,7 +9,14 @@
  * @returns {object} Supernova definition.
  */
 
-import { useElement, useLayout, useEffect, useModel, useState } from '@nebula.js/stardust';
+import {
+    useElement,
+    useLayout,
+    useEffect,
+    useModel,
+    useState,
+    onContextMenu,
+} from '@nebula.js/stardust';
 import ext from './ext/index.js';
 import data from './data.js';
 import definition from './object-properties.js';
@@ -56,6 +63,26 @@ export default function supernova(_galaxy) {
                 if (!layout || !model) return;
                 fetchAllRows(layout, model).then(setScript);
             }, [layout, model]);
+
+            // Add "Copy selected text" to the right-click context menu
+            onContextMenu((menu) => {
+                const sel = window.getSelection();
+                const text = sel ? sel.toString() : '';
+                if (text) {
+                    menu.addItem({
+                        translation: 'Copy selected text',
+                        tid: 'copy-selection',
+                        icon: 'copy',
+
+                        /**
+                         * Copy the selected text to the clipboard.
+                         */
+                        select() {
+                            navigator.clipboard.writeText(text);
+                        },
+                    });
+                }
+            });
 
             // Render when script or layout changes
             useEffect(() => {

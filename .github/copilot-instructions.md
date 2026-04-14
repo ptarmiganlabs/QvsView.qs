@@ -57,6 +57,7 @@ If any check fails, fix the issues and run checks again.
 - No runtime dependencies — extension is fully self-contained
 - Keywords are case-insensitive in Qlik script
 - Build-time tokens: `__BUILD_TYPE__`, `__PACKAGE_VERSION__`, `__BUILD_DATE__`
+- **Extension upload**: You cannot upload the extension zip to Qlik Sense yourself. After building, tell the user the zip is ready and wait for them to confirm the upload is done before testing.
 
 ## Coding Guidelines
 

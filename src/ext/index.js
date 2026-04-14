@@ -25,8 +25,9 @@ import { aboutSection } from './about-section.js';
 export default function ext(_galaxy) {
     return {
         support: {
-            snapshot: true,
-            export: true,
+            snapshot: false,
+            export: false,
+            exportData: false,
             sharing: false,
             viewData: false,
         },
