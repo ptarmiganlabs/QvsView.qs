@@ -215,10 +215,14 @@ function renderSection(element, opts) {
         });
     }
 
+    // ── Search event listeners ──
+    const container = element.querySelector(`.${CSS_PREFIX}-container`);
+
     // ── Keyboard copy handler (Ctrl/Cmd+C) for selected text ──
-    const codeArea = element.querySelector(`.${CSS_PREFIX}-code`);
-    if (codeArea) {
-        codeArea.addEventListener('copy', (e) => {
+    // Must listen on the container because Qlik focuses .qvs-container (tabindex="0")
+    // and the browser dispatches `copy` on the active element, not on child nodes.
+    if (container) {
+        container.addEventListener('copy', (e) => {
             const sel = window.getSelection();
             if (sel && sel.toString()) {
                 e.preventDefault();
@@ -226,9 +230,6 @@ function renderSection(element, opts) {
             }
         });
     }
-
-    // ── Search event listeners ──
-    const container = element.querySelector(`.${CSS_PREFIX}-container`);
 
     // Keyboard shortcuts on the container
     if (container) {
@@ -327,15 +328,6 @@ function updateCodeHighlights(element, opts) {
     if (codeEl) {
         codeEl.innerHTML = `<code>${codeHTML}</code>`;
         codeEl.style.fontSize = `${fontSize}px`;
-
-        // Re-attach copy handler on the new code content
-        codeEl.addEventListener('copy', (e) => {
-            const sel = window.getSelection();
-            if (sel && sel.toString()) {
-                e.preventDefault();
-                e.clipboardData.setData('text/plain', sel.toString());
-            }
-        });
     }
 
     // Update match count text
