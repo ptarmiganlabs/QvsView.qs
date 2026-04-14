@@ -53,12 +53,24 @@ function buildTabBar(sections, activeIndex) {
 }
 
 /**
- * Build the toolbar HTML (copy button).
+ * Detect the platform modifier key label.
+ *
+ * @returns {string} "Cmd" on Mac, "Ctrl" otherwise.
+ */
+function modKey() {
+    return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+        ? 'Cmd'
+        : 'Ctrl';
+}
+
+/**
+ * Build the toolbar HTML (copy button + search hint).
  *
  * @returns {string} HTML string for the toolbar.
  */
 function buildToolbar() {
     return `<div class="${CSS_PREFIX}-toolbar">
+        <span class="${CSS_PREFIX}-search-hint" title="Open search">${modKey()}+F</span>
         <button class="${CSS_PREFIX}-copy-btn" title="Copy to clipboard">&#128203; Copy</button>
     </div>`;
 }
@@ -156,9 +168,9 @@ function renderSection(element, opts) {
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
                 ${buildTabBar(sections, activeIndex)}
-                ${searchActive ? buildSearchBar(searchQuery, activeMatchIndex, matches.length) : ''}
                 ${buildToolbar()}
             </div>
+            ${searchActive ? buildSearchBar(searchQuery, activeMatchIndex, matches.length) : ''}
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
                 ${gutterHTML}
                 <pre class="${CSS_PREFIX}-code" style="font-size:${fontSize}px"><code>${codeHTML}</code></pre>
@@ -203,12 +215,25 @@ function renderSection(element, opts) {
         });
     }
 
+    // ── Keyboard copy handler (Ctrl/Cmd+C) for selected text ──
+    const codeArea = element.querySelector(`.${CSS_PREFIX}-code`);
+    if (codeArea) {
+        codeArea.addEventListener('copy', (e) => {
+            const sel = window.getSelection();
+            if (sel && sel.toString()) {
+                e.preventDefault();
+                e.clipboardData.setData('text/plain', sel.toString());
+            }
+        });
+    }
+
     // ── Search event listeners ──
     const container = element.querySelector(`.${CSS_PREFIX}-container`);
 
-    // Keyboard shortcut: Ctrl/Cmd+F to open search
+    // Keyboard shortcuts on the container
     if (container) {
         container.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd+F to open search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
                 e.stopPropagation();
@@ -229,11 +254,16 @@ function renderSection(element, opts) {
         // Focus the input on initial open
         searchInput.focus();
 
-        // Live search on input
-        searchInput.addEventListener('input', (e) => {
-            element.dataset.qvsSearchQuery = e.target.value;
-            element.dataset.qvsSearchMatch = '0';
-            renderSection(element, opts);
+        // Live search on input — update highlights without replacing search bar
+        let debounceTimer = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const query = searchInput.value;
+                element.dataset.qvsSearchQuery = query;
+                element.dataset.qvsSearchMatch = '0';
+                updateCodeHighlights(element, opts);
+            }, 80);
         });
 
         // Enter = next, Shift+Enter = prev, Escape = close
@@ -257,6 +287,73 @@ function renderSection(element, opts) {
         // Close button
         const closeBtn = element.querySelector(`.${CSS_PREFIX}-search-close`);
         if (closeBtn) closeBtn.addEventListener('click', () => closeSearch(element, opts));
+    }
+}
+
+/**
+ * Update code highlights and match count without replacing the search bar DOM.
+ *
+ * This avoids destroying the search input (and losing cursor position / focus)
+ * when the user types in the search field.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {object} opts - Current render options.
+ *
+ * @returns {void}
+ */
+function updateCodeHighlights(element, opts) {
+    const { sections, activeIndex, fontSize } = opts;
+    const section = sections[activeIndex];
+    const sectionScript = section.content;
+    const query = element.dataset.qvsSearchQuery || '';
+
+    const tokenizedLines = tokenize(sectionScript);
+    let codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
+
+    let matches = [];
+    const activeMatchIndex = 0;
+
+    if (query) {
+        matches = findMatchOffsets(sectionScript, query);
+        element.dataset.qvsSearchMatch = '0';
+
+        if (matches.length > 0) {
+            codeHTML = highlightMatches(codeHTML, sectionScript, matches, activeMatchIndex);
+        }
+    }
+
+    // Update only the code element
+    const codeEl = element.querySelector(`.${CSS_PREFIX}-code`);
+    if (codeEl) {
+        codeEl.innerHTML = `<code>${codeHTML}</code>`;
+        codeEl.style.fontSize = `${fontSize}px`;
+
+        // Re-attach copy handler on the new code content
+        codeEl.addEventListener('copy', (e) => {
+            const sel = window.getSelection();
+            if (sel && sel.toString()) {
+                e.preventDefault();
+                e.clipboardData.setData('text/plain', sel.toString());
+            }
+        });
+    }
+
+    // Update match count text
+    const countEl = element.querySelector(`.${CSS_PREFIX}-search-count`);
+    if (countEl) {
+        countEl.textContent = query ? `${matches.length > 0 ? 1 : 0} of ${matches.length}` : '';
+    }
+
+    // Update prev/next button state
+    const prevBtn = element.querySelector(`.${CSS_PREFIX}-search-prev`);
+    const nextBtn = element.querySelector(`.${CSS_PREFIX}-search-next`);
+    if (prevBtn) prevBtn.disabled = matches.length <= 0;
+    if (nextBtn) nextBtn.disabled = matches.length <= 0;
+
+    // Scroll to first match
+    if (matches.length > 0) {
+        const viewer = element.querySelector(`.${CSS_PREFIX}-viewer`);
+        if (viewer) scrollToMatch(viewer, 0);
     }
 }
 

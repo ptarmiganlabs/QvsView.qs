@@ -87,6 +87,15 @@
     color: #333;
 }
 
+.qvs-search-hint {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 10px;
+    color: #aaa;
+    padding: 0 6px;
+    white-space: nowrap;
+    cursor: default;
+}
+
 /* ── Viewer container ── */
 .qvs-viewer {
     display: flex;
@@ -176,6 +185,8 @@
     gap: 4px;
     padding: 3px 8px;
     flex-shrink: 0;
+    background: #f0f0f0;
+    border-bottom: 1px solid #ddd;
 }
 
 .qvs-search-input {
