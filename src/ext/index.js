@@ -38,6 +38,9 @@ export default function ext(_galaxy) {
                     uses: 'data',
                 },
                 viewerSection: viewerSection(),
+                appearance: {
+                    uses: 'settings',
+                },
                 aboutSection: aboutSection(),
             },
         },

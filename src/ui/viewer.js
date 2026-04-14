@@ -218,22 +218,22 @@ function renderSection(element, opts) {
     // ── Search event listeners ──
     const container = element.querySelector(`.${CSS_PREFIX}-container`);
 
-    // ── Keyboard copy handler (Ctrl/Cmd+C) for selected text ──
-    // Must listen on the container because Qlik focuses .qvs-container (tabindex="0")
-    // and the browser dispatches `copy` on the active element, not on child nodes.
-    if (container) {
-        container.addEventListener('copy', (e) => {
-            const sel = window.getSelection();
-            if (sel && sel.toString()) {
-                e.preventDefault();
-                e.clipboardData.setData('text/plain', sel.toString());
-            }
-        });
-    }
-
     // Keyboard shortcuts on the container
     if (container) {
         container.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd+C — copy selected text directly to clipboard.
+            // Qlik's framework prevents the default copy-event chain, so we
+            // intercept at keydown and use the Clipboard API instead.
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                const sel = window.getSelection();
+                const text = sel ? sel.toString() : '';
+                if (text) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(text);
+                }
+            }
+
             // Ctrl/Cmd+F to open search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
