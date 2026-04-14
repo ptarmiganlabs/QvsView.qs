@@ -1,0 +1,54 @@
+/**
+ * Viewer display settings section for the property panel.
+ *
+ * Controls line numbers, word wrap, and font size.
+ *
+ * @returns {object} Property panel section definition.
+ */
+export function viewerSection() {
+    return {
+        type: 'items',
+        label: 'Viewer Settings',
+        items: {
+            showLineNumbers: {
+                ref: 'viewer.showLineNumbers',
+                type: 'boolean',
+                label: 'Show line numbers',
+                defaultValue: true,
+                component: 'switch',
+                options: [
+                    { value: true, label: 'On' },
+                    { value: false, label: 'Off' },
+                ],
+            },
+            wordWrap: {
+                ref: 'viewer.wordWrap',
+                type: 'boolean',
+                label: 'Word wrap',
+                defaultValue: false,
+                component: 'switch',
+                options: [
+                    { value: true, label: 'On' },
+                    { value: false, label: 'Off' },
+                ],
+            },
+            fontSize: {
+                ref: 'viewer.fontSize',
+                type: 'number',
+                label: 'Font size (px)',
+                defaultValue: 13,
+                component: 'dropdown',
+                options: [
+                    { value: 10, label: '10' },
+                    { value: 11, label: '11' },
+                    { value: 12, label: '12' },
+                    { value: 13, label: '13' },
+                    { value: 14, label: '14' },
+                    { value: 16, label: '16' },
+                    { value: 18, label: '18' },
+                    { value: 20, label: '20' },
+                ],
+            },
+        },
+    };
+}

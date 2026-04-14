@@ -1,0 +1,76 @@
+/* ── QvsView.qs — Script Viewer Styles ── */
+
+/* ── Viewer container ── */
+.qvs-viewer {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: #fafafa;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    line-height: 1.5;
+    box-sizing: border-box;
+}
+
+/* ── Line numbers gutter ── */
+.qvs-gutter {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 8px 12px 8px 8px;
+    text-align: right;
+    color: #999;
+    background: #f0f0f0;
+    border-right: 1px solid #ddd;
+    user-select: none;
+    white-space: pre;
+    overflow: hidden;
+}
+
+/* ── Code area ── */
+.qvs-code {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 8px 12px;
+    overflow-x: auto;
+    white-space: pre;
+    tab-size: 4;
+}
+
+.qvs-code code {
+    display: block;
+    white-space: pre;
+}
+
+/* ── Word wrap mode ── */
+.qvs-wrap .qvs-code {
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.qvs-wrap .qvs-code code {
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* ── Placeholder (no data) ── */
+.qvs-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #888;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.qvs-placeholder-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+}
+
+.qvs-placeholder-text {
+    font-size: 14px;
+}

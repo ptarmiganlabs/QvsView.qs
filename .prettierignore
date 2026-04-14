@@ -1,0 +1,6 @@
+dist/
+node_modules/
+qvsview-qs-ext/
+*.zip
+package-lock.json
+bnf/

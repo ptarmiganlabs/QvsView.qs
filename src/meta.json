@@ -1,0 +1,16 @@
+{
+    "name": "QvsView.qs",
+    "description": "Read-only Qlik script viewer with syntax highlighting",
+    "type": "visualization",
+    "version": "0.1.0",
+    "icon": "code",
+    "preview": "preview.png",
+    "author": "Göran Sander, Ptarmigan Labs",
+    "homepage": "https://github.com/ptarmiganlabs/QvsView.qs",
+    "keywords": "qlik-sense, visualization, script, viewer, syntax-highlighting",
+    "license": "MIT",
+    "repository": "https://github.com/ptarmiganlabs/QvsView.qs",
+    "dependencies": {
+        "qlik-sense": ">=3.0.x"
+    }
+}
