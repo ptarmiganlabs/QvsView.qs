@@ -9,13 +9,16 @@
  * @returns {object} Supernova definition.
  */
 
-import { useElement, useLayout, useEffect } from '@nebula.js/stardust';
+import { useElement, useLayout, useEffect, useModel, useState } from '@nebula.js/stardust';
 import ext from './ext/index.js';
 import data from './data.js';
 import definition from './object-properties.js';
 import { renderViewer, renderPlaceholder } from './ui/viewer.js';
 import logger, { PACKAGE_VERSION, BUILD_DATE } from './util/logger.js';
 import './style.css';
+
+/** Maximum rows per page request. Qlik limits to 10000. */
+const PAGE_SIZE = 10000;
 
 /**
  * Supernova component factory.
@@ -40,17 +43,23 @@ export default function supernova(_galaxy) {
          */
         component() {
             const layout = useLayout();
+            const model = useModel();
             const element = useElement();
+            const [script, setScript] = useState(null);
 
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
             }, []);
 
+            // Fetch all hypercube data (with pagination for large scripts)
+            useEffect(() => {
+                if (!layout || !model) return;
+                fetchAllRows(layout, model).then(setScript);
+            }, [layout, model]);
+
+            // Render when script or layout changes
             useEffect(() => {
                 if (!layout) return;
-
-                // Extract script text from hypercube
-                const script = extractScript(layout);
 
                 if (!script) {
                     renderPlaceholder(element);
@@ -65,42 +74,72 @@ export default function supernova(_galaxy) {
                     wordWrap: viewerOpts.wordWrap === true,
                     fontSize: viewerOpts.fontSize || 13,
                 });
-            }, [layout, element]);
+            }, [layout, element, script]);
         },
     };
 }
 
 /**
- * Extract script text from the hypercube in layout.
+ * Fetch all rows from the hypercube, paginating if necessary.
  *
- * Each row in the hypercube represents one value from the script field.
- * Rows are joined with newlines to form the complete script.
+ * The initial data fetch (from qInitialDataFetch) is included in the layout.
+ * If the total row count exceeds what was fetched, additional pages are
+ * requested via GetHyperCubeData.
  *
  * @param {object} layout - Qlik Sense layout object.
+ * @param {object} model - Qlik engine model (GenericObject).
  *
- * @returns {string|null} The combined script text, or null if no data.
+ * @returns {Promise<string|null>} The combined script text, or null if no data.
  */
-function extractScript(layout) {
+async function fetchAllRows(layout, model) {
     const hc = layout?.qHyperCube;
     if (!hc) return null;
 
-    const pages = hc.qDataPages;
-    if (!pages || pages.length === 0) return null;
+    const totalRows = hc.qSize?.qcy || 0;
+    if (totalRows === 0) return null;
 
+    // Collect rows from initial data pages
     const lines = [];
-    for (const page of pages) {
-        const matrix = page.qMatrix;
-        if (!matrix) continue;
-        for (const row of matrix) {
-            if (row.length > 0 && row[0]?.qText != null) {
-                lines.push(row[0].qText);
+    const pages = hc.qDataPages;
+    if (pages) {
+        for (const page of pages) {
+            if (page.qMatrix) {
+                for (const row of page.qMatrix) {
+                    if (row.length > 0 && row[0]?.qText != null) {
+                        lines.push(row[0].qText);
+                    }
+                }
             }
         }
     }
 
-    if (lines.length === 0) return null;
+    // If we already have all rows, we're done
+    if (lines.length >= totalRows) {
+        return lines.length > 0 ? lines.join('\n') : null;
+    }
 
-    // If the field contains the full script in a single value,
-    // return it directly. If it's multiple rows, join them.
-    return lines.join('\n');
+    // Fetch remaining pages
+    let fetched = lines.length;
+    while (fetched < totalRows) {
+        const height = Math.min(PAGE_SIZE, totalRows - fetched);
+        try {
+            const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
+                { qTop: fetched, qLeft: 0, qWidth: 1, qHeight: height },
+            ]);
+            if (!dataPages || dataPages.length === 0) break;
+            const matrix = dataPages[0].qMatrix;
+            if (!matrix || matrix.length === 0) break;
+            for (const row of matrix) {
+                if (row.length > 0 && row[0]?.qText != null) {
+                    lines.push(row[0].qText);
+                }
+            }
+            fetched = lines.length;
+        } catch (err) {
+            logger.warn('Pagination fetch failed, using partial data:', err);
+            break;
+        }
+    }
+
+    return lines.length > 0 ? lines.join('\n') : null;
 }

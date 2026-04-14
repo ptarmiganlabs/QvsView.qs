@@ -1,11 +1,98 @@
 /* ── QvsView.qs — Script Viewer Styles ── */
 
+/* ── Container ── */
+.qvs-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ── Header (tab bar + toolbar) ── */
+.qvs-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: #f0f0f0;
+    border-bottom: 1px solid #ddd;
+    min-height: 0;
+}
+
+/* ── Tab bar ── */
+.qvs-tab-bar {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    flex: 1 1 auto;
+    gap: 0;
+    min-width: 0;
+}
+
+.qvs-tab {
+    padding: 6px 14px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    color: #666;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition:
+        color 0.15s,
+        border-color 0.15s;
+}
+
+.qvs-tab:hover {
+    color: #333;
+    background: #e8e8e8;
+}
+
+.qvs-tab-active {
+    color: #333;
+    border-bottom-color: #4a90d9;
+    font-weight: 600;
+}
+
+/* ── Toolbar ── */
+.qvs-toolbar {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0 8px;
+}
+
+.qvs-copy-btn {
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    color: #555;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+
+.qvs-copy-btn:hover {
+    background: #e8e8e8;
+    color: #333;
+}
+
 /* ── Viewer container ── */
 .qvs-viewer {
     display: flex;
     flex-direction: row;
     width: 100%;
-    height: 100%;
+    flex: 1 1 auto;
     overflow: auto;
     background: #fafafa;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;

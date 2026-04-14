@@ -2,11 +2,13 @@
  * Read-only code viewer renderer.
  *
  * Takes script text, tokenizes it, and renders a scrollable code view
- * with optional line numbers and syntax highlighting.
+ * with optional line numbers, syntax highlighting, section tabs, and
+ * a copy-to-clipboard button.
  */
 
 import { tokenize, renderTokensToHTML } from '../syntax/highlighter.js';
 import { buildTokenCSS } from '../syntax/tokens.js';
+import { parseSections } from '../sections.js';
 
 const CSS_PREFIX = 'qvs';
 
@@ -29,7 +31,42 @@ function injectCSS() {
 }
 
 /**
+ * Build the tab bar HTML for script sections.
+ *
+ * @param {import('../sections.js').ScriptSection[]} sections - Parsed script sections.
+ * @param {number} activeIndex - Index of the currently active section.
+ *
+ * @returns {string} HTML string for the tab bar.
+ */
+function buildTabBar(sections, activeIndex) {
+    if (sections.length <= 1) return '';
+
+    const tabs = sections
+        .map(
+            (s, i) =>
+                `<button class="${CSS_PREFIX}-tab${i === activeIndex ? ` ${CSS_PREFIX}-tab-active` : ''}" data-section-index="${i}">${escapeHTML(s.name)}</button>`
+        )
+        .join('');
+
+    return `<div class="${CSS_PREFIX}-tab-bar">${tabs}</div>`;
+}
+
+/**
+ * Build the toolbar HTML (copy button).
+ *
+ * @returns {string} HTML string for the toolbar.
+ */
+function buildToolbar() {
+    return `<div class="${CSS_PREFIX}-toolbar">
+        <button class="${CSS_PREFIX}-copy-btn" title="Copy to clipboard">&#128203; Copy</button>
+    </div>`;
+}
+
+/**
  * Render the script viewer into the given DOM element.
+ *
+ * Supports section tabs (split on `///$tab` markers), a copy-to-clipboard
+ * button, optional line numbers, and word wrap.
  *
  * @param {HTMLElement} element - The extension's root DOM element.
  * @param {object} options - Rendering options.
@@ -45,25 +82,99 @@ export function renderViewer(element, options) {
 
     const { script, showLineNumbers = true, wordWrap = false, fontSize = 13 } = options;
 
-    const tokenizedLines = tokenize(script);
+    const sections = parseSections(script);
+
+    // Preserve active tab across re-renders if possible
+    const prevIndex = parseInt(element.dataset.qvsActiveSection || '0', 10);
+    const activeIndex = prevIndex < sections.length ? prevIndex : 0;
+
+    renderSection(element, {
+        sections,
+        activeIndex,
+        showLineNumbers,
+        wordWrap,
+        fontSize,
+        fullScript: script,
+    });
+}
+
+/**
+ * Render a specific section with its tab bar, toolbar, and code.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {object} opts - Render options.
+ * @param {import('../sections.js').ScriptSection[]} opts.sections - All parsed sections.
+ * @param {number} opts.activeIndex - Index of section to display.
+ * @param {boolean} opts.showLineNumbers - Show line number gutter.
+ * @param {boolean} opts.wordWrap - Wrap long lines.
+ * @param {number} opts.fontSize - Font size in pixels.
+ * @param {string} opts.fullScript - The complete script text (for "copy all").
+ *
+ * @returns {void}
+ */
+function renderSection(element, opts) {
+    const { sections, activeIndex, showLineNumbers, wordWrap, fontSize, fullScript } = opts;
+
+    const section = sections[activeIndex];
+    const sectionScript = section.content;
+
+    const tokenizedLines = tokenize(sectionScript);
     const codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
     const lineCount = tokenizedLines.length;
+    const lineOffset = section.startLine + (sections.length > 1 ? 1 : 0); // offset for ///$tab line
 
     const wrapClass = wordWrap ? `${CSS_PREFIX}-wrap` : '';
 
-    // Build line numbers gutter
+    // Build line numbers gutter (use global line numbers)
     let gutterHTML = '';
     if (showLineNumbers) {
-        const numbers = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
+        const numbers = Array.from({ length: lineCount }, (_, i) => lineOffset + i + 1).join('\n');
         gutterHTML = `<pre class="${CSS_PREFIX}-gutter" style="font-size:${fontSize}px">${numbers}</pre>`;
     }
 
+    element.dataset.qvsActiveSection = String(activeIndex);
+
     element.innerHTML = `
-        <div class="${CSS_PREFIX}-viewer ${wrapClass}">
-            ${gutterHTML}
-            <pre class="${CSS_PREFIX}-code" style="font-size:${fontSize}px"><code>${codeHTML}</code></pre>
+        <div class="${CSS_PREFIX}-container">
+            <div class="${CSS_PREFIX}-header">
+                ${buildTabBar(sections, activeIndex)}
+                ${buildToolbar()}
+            </div>
+            <div class="${CSS_PREFIX}-viewer ${wrapClass}">
+                ${gutterHTML}
+                <pre class="${CSS_PREFIX}-code" style="font-size:${fontSize}px"><code>${codeHTML}</code></pre>
+            </div>
         </div>
     `;
+
+    // ── Attach event listeners ──
+
+    // Tab click handler
+    element.querySelectorAll(`.${CSS_PREFIX}-tab`).forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.dataset.sectionIndex, 10);
+            if (idx === activeIndex) return;
+            renderSection(element, { ...opts, activeIndex: idx });
+        });
+    });
+
+    // Copy button handler
+    const copyBtn = element.querySelector(`.${CSS_PREFIX}-copy-btn`);
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(fullScript).then(
+                () => {
+                    copyBtn.textContent = '\u2713 Copied!';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '&#128203; Copy';
+                    }, 2000);
+                },
+                () => {
+                    copyBtn.textContent = 'Failed';
+                }
+            );
+        });
+    }
 }
 
 /**
@@ -81,4 +192,19 @@ export function renderPlaceholder(element, message = 'Add a dimension containing
             <div class="${CSS_PREFIX}-placeholder-text">${message}</div>
         </div>
     `;
+}
+
+/**
+ * Escape HTML special characters for safe rendering.
+ *
+ * @param {string} text - Raw text to escape.
+ *
+ * @returns {string} HTML-escaped text.
+ */
+function escapeHTML(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }

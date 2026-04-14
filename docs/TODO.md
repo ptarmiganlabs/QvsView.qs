@@ -18,10 +18,10 @@
 ## Phase 3: Viewer Features
 
 - [ ] Dark theme option
-- [ ] Copy to clipboard button
-- [ ] Script section detection (tab headers like `///$tab Main`)
-- [ ] Section navigation / tab switcher
-- [ ] Search within script (Ctrl+F)
+- [x] Copy to clipboard button
+- [x] Script section detection (tab headers like `///$tab Main`)
+- [x] Section navigation / tab switcher
+- [ ] Search within script (Ctrl/Cmd+F)
 - [ ] Collapsible code blocks / folding
 
 ## Phase 4: BNF Parser Integration (Optional)
@@ -33,7 +33,9 @@
 
 ## Known Issues
 
-- [ ] `qInitialDataFetch` height (10,000 rows) may not cover very large scripts — need pagination
+- [x] `qInitialDataFetch` height (10,000 rows) may not cover very large scripts — pagination added via `getHyperCubeData`
+- [x] Hypercube dimension sorting was alphabetical by default — fixed with `qSortByLoadOrder: 1` in `data.js`
+- [ ] Existing objects require dimension removal + re-add for sort fix to take effect
 - [ ] Font size dropdown values may need adjustment after user testing
 
 ## Ideas
