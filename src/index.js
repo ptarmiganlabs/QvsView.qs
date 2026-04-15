@@ -21,6 +21,8 @@ import ext from './ext/index.js';
 import data from './data.js';
 import definition from './object-properties.js';
 import { renderViewer, renderPlaceholder } from './ui/viewer.js';
+import { applyRuntimeBnf, resetToStaticBnf } from './syntax/keywords.js';
+import { fetchRuntimeBnf, clearBnfCache } from './syntax/bnf-loader.js';
 import logger, { PACKAGE_VERSION, BUILD_DATE } from './util/logger.js';
 import './style.css';
 
@@ -53,10 +55,31 @@ export default function supernova(_galaxy) {
             const model = useModel();
             const element = useElement();
             const [script, setScript] = useState(null);
+            const [bnfReady, setBnfReady] = useState(false);
 
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
             }, []);
+
+            // Handle runtime BNF loading based on property toggle
+            useEffect(() => {
+                if (!layout) return;
+                const useRuntime = layout.viewer?.useRuntimeBnf === true;
+
+                if (useRuntime) {
+                    fetchRuntimeBnf().then((sets) => {
+                        if (sets) {
+                            applyRuntimeBnf(sets);
+                            logger.info('Runtime BNF applied');
+                        }
+                        setBnfReady(true);
+                    });
+                } else {
+                    clearBnfCache();
+                    resetToStaticBnf();
+                    setBnfReady(true);
+                }
+            }, [layout?.viewer?.useRuntimeBnf]);
 
             // Fetch all hypercube data (with pagination for large scripts)
             useEffect(() => {
@@ -101,7 +124,7 @@ export default function supernova(_galaxy) {
                     wordWrap: viewerOpts.wordWrap === true,
                     fontSize: viewerOpts.fontSize || 13,
                 });
-            }, [layout, element, script]);
+            }, [layout, element, script, bnfReady]);
         },
     };
 }

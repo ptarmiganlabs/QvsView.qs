@@ -10,8 +10,8 @@
 
 ## Phase 2: Enhanced Highlighting
 
-- [ ] Parse BNF file (`bnf/getBaseBNF_result.json`) to auto-generate complete keyword/function lists
-- [ ] Add remaining functions from BNF (currently ~250 of 344 included)
+- [x] Parse BNF file (`bnf/getBaseBNF_result.json`) to auto-generate complete keyword/function lists
+- [x] Add remaining functions from BNF — all 343 functions + 90 aggregation functions now included
 - [ ] Variable expansion highlighting (`$(vName)`)
 - [ ] `REM` comment edge cases (nested semicolons)
 
@@ -25,12 +25,14 @@
 - [x] Search within script (Ctrl/Cmd+F)
 - [ ] Collapsible code blocks / folding
 
-## Phase 4: BNF Parser Integration (Optional)
+## Phase 4: BNF Parser Integration
 
-- [ ] Investigate hooking into Qlik Sense's native `bnfLang` AMD module
-- [ ] Create AMD module discovery utility
-- [ ] Wrap native tokenizer with fallback to regex highlighter
-- [ ] Test on Qlik Cloud vs client-managed
+- [x] Investigate hooking into Qlik Sense's native `bnfLang` AMD module — NOT accessible from extension context (only in Data Load Editor micro-frontend)
+- [x] Static BNF extraction: `scripts/extract-bnf-keywords.mjs` parses raw BNF JSON into pre-extracted keyword arrays (6KB vs 557KB raw JSON)
+- [x] Runtime BNF fetch: property panel toggle fetches live BNF via Engine API `getBaseBNF()` + `bnf-parser.js` + `bnf-loader.js`
+- [x] Deprecated function detection: 18 deprecated entries rendered with strikethrough styling
+- [x] Field token type: `[FieldName]` bracket references highlighted as field (orange)
+- [ ] Test runtime BNF toggle on Qlik Cloud vs client-managed
 
 ## Known Issues
 

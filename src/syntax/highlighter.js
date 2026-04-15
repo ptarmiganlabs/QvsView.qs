@@ -4,10 +4,10 @@
  * Produces an array of token objects per line, each with a type and text.
  * The tokenizer is stateful across lines to handle multi-line comments and strings.
  *
- * Token types: keyword, function, variable, string, comment, operator, number, normal.
+ * Token types: keyword, function, variable, string, comment, operator, number, normal, field, table, deprecated.
  */
 
-import { ALL_KEYWORDS, ALL_FUNCTIONS } from './keywords.js';
+import { ALL_KEYWORDS, ALL_FUNCTIONS, DEPRECATED } from './keywords.js';
 
 /**
  * @typedef {object} Token
@@ -45,6 +45,14 @@ export function tokenizeLine(line, state) {
     /** @type {Token[]} */
     const tokens = [];
     let pos = 0;
+
+    /**
+     * Tracks the lowercase form of the last keyword emitted on this line.
+     * Used for context-aware heuristics: after 'as' → field, after 'set'/'let' → variable.
+     *
+     * @type {string|null}
+     */
+    let lastKeywordLower = null;
 
     /**
      * Push a token onto the result array.
@@ -101,6 +109,7 @@ export function tokenizeLine(line, state) {
         // ── Line comment // ──
         if (ch === '/' && line[pos + 1] === '/') {
             push('comment', line.slice(pos));
+            lastKeywordLower = null;
             pos = line.length;
             continue;
         }
@@ -125,6 +134,7 @@ export function tokenizeLine(line, state) {
             while (end < line.length && line[end] !== "'") end++;
             if (end < line.length) end++; // include closing quote
             push('string', line.slice(pos, end));
+            lastKeywordLower = null;
             pos = end;
             continue;
         }
@@ -135,6 +145,7 @@ export function tokenizeLine(line, state) {
             while (end < line.length && line[end] !== '"') end++;
             if (end < line.length) end++;
             push('string', line.slice(pos, end));
+            lastKeywordLower = null;
             pos = end;
             continue;
         }
@@ -144,7 +155,7 @@ export function tokenizeLine(line, state) {
             let end = pos + 1;
             while (end < line.length && line[end] !== ']') end++;
             if (end < line.length) end++;
-            push('string', line.slice(pos, end));
+            push('field', line.slice(pos, end));
             pos = end;
             continue;
         }
@@ -172,6 +183,7 @@ export function tokenizeLine(line, state) {
         // ── Operators ──
         if (/[+\-*/=<>&|!;,(){}]/.test(ch)) {
             push('operator', ch);
+            lastKeywordLower = null;
             pos++;
             continue;
         }
@@ -181,6 +193,7 @@ export function tokenizeLine(line, state) {
             let end = pos + 1;
             while (end < line.length && /[\d.]/.test(line[end])) end++;
             push('number', line.slice(pos, end));
+            lastKeywordLower = null;
             pos = end;
             continue;
         }
@@ -211,12 +224,53 @@ export function tokenizeLine(line, state) {
             while (peekPos < line.length && line[peekPos] === ' ') peekPos++;
             const isCall = peekPos < line.length && line[peekPos] === '(';
 
+            // ── Context-aware heuristics ──
+
+            // Table label: word immediately followed by : (but not URL schemes like http://)
+            if (
+                !isCall &&
+                peekPos < line.length &&
+                line[peekPos] === ':' &&
+                !(line[peekPos + 1] === '/' && line[peekPos + 2] === '/') &&
+                !ALL_KEYWORDS.has(lower) &&
+                !ALL_FUNCTIONS.has(lower)
+            ) {
+                push('table', word);
+                lastKeywordLower = null;
+                pos = end;
+                continue;
+            }
+
+            // After AS → next identifier is a field alias
+            if (lastKeywordLower === 'as' && !isCall && !ALL_KEYWORDS.has(lower)) {
+                push('field', word);
+                lastKeywordLower = null;
+                pos = end;
+                continue;
+            }
+
+            // After SET/LET → next identifier is a variable name
+            if (
+                (lastKeywordLower === 'set' || lastKeywordLower === 'let') &&
+                !isCall &&
+                !ALL_KEYWORDS.has(lower)
+            ) {
+                push('variable', word);
+                lastKeywordLower = null;
+                pos = end;
+                continue;
+            }
+
+            // ── Standard classification ──
             if (isCall && ALL_FUNCTIONS.has(lower)) {
-                push('function', word);
+                push(DEPRECATED.has(lower) ? 'deprecated' : 'function', word);
+                lastKeywordLower = null;
             } else if (ALL_KEYWORDS.has(lower)) {
-                push('keyword', word);
+                push(DEPRECATED.has(lower) ? 'deprecated' : 'keyword', word);
+                lastKeywordLower = lower;
             } else {
                 push('normal', word);
+                lastKeywordLower = null;
             }
             pos = end;
             continue;

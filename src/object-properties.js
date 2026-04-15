@@ -21,5 +21,6 @@ export default {
         showLineNumbers: true,
         wordWrap: false,
         fontSize: 13,
+        useRuntimeBnf: false,
     },
 };

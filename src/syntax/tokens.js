@@ -4,7 +4,7 @@
  * Colors are extracted from the Qlik Sense Data Load Editor (CodeMirror 5 + sense-script mode).
  */
 
-/** @type {Record<string, {color: string, fontWeight: string, fontStyle: string}>} */
+/** @type {Record<string, {color: string, fontWeight: string, fontStyle: string, textDecoration?: string}>} */
 export const TOKEN_STYLES = {
     keyword: { color: '#6A8FDE', fontWeight: 'bold', fontStyle: 'normal' },
     function: { color: '#6A8FDE', fontWeight: 'bold', fontStyle: 'normal' },
@@ -12,8 +12,16 @@ export const TOKEN_STYLES = {
     string: { color: '#44751D', fontWeight: 'normal', fontStyle: 'normal' },
     comment: { color: '#808080', fontWeight: 'normal', fontStyle: 'italic' },
     operator: { color: '#000000', fontWeight: 'normal', fontStyle: 'normal' },
-    number: { color: '#000000', fontWeight: 'normal', fontStyle: 'normal' },
+    number: { color: '#3A7391', fontWeight: 'normal', fontStyle: 'normal' },
     normal: { color: '#000000', fontWeight: 'normal', fontStyle: 'normal' },
+    table: { color: '#8E477D', fontWeight: 'bold', fontStyle: 'normal' },
+    field: { color: '#CC9966', fontWeight: 'bold', fontStyle: 'normal' },
+    deprecated: {
+        color: '#6A8FDE',
+        fontWeight: 'bold',
+        fontStyle: 'normal',
+        textDecoration: 'line-through',
+    },
 };
 
 /**
@@ -25,9 +33,13 @@ export const TOKEN_STYLES = {
  */
 export function buildTokenCSS(prefix) {
     return Object.entries(TOKEN_STYLES)
-        .map(
-            ([type, style]) =>
-                `.${prefix}-token-${type} { color: ${style.color}; font-weight: ${style.fontWeight}; font-style: ${style.fontStyle}; }`
-        )
+        .map(([type, style]) => {
+            let css = `.${prefix}-token-${type} { color: ${style.color}; font-weight: ${style.fontWeight}; font-style: ${style.fontStyle};`;
+            if (style.textDecoration) {
+                css += ` text-decoration: ${style.textDecoration};`;
+            }
+            css += ' }';
+            return css;
+        })
         .join('\n');
 }

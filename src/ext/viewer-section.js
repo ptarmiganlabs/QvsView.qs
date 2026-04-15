@@ -1,7 +1,7 @@
 /**
  * Viewer display settings section for the property panel.
  *
- * Controls line numbers, word wrap, and font size.
+ * Controls line numbers, word wrap, font size, and runtime BNF fetching.
  *
  * @returns {object} Property panel section definition.
  */
@@ -48,6 +48,21 @@ export function viewerSection() {
                     { value: 18, label: '18' },
                     { value: 20, label: '20' },
                 ],
+            },
+            useRuntimeBnf: {
+                ref: 'viewer.useRuntimeBnf',
+                type: 'boolean',
+                label: 'Live keyword updates',
+                defaultValue: false,
+                component: 'switch',
+                options: [
+                    { value: true, label: 'On' },
+                    { value: false, label: 'Off' },
+                ],
+                description:
+                    'Fetch the latest keyword and function lists from the Qlik Engine at runtime. ' +
+                    'Ensures highlighting stays current with your Qlik Sense version. ' +
+                    'When off, uses the built-in keyword list bundled with the extension.',
             },
         },
     };

@@ -2,109 +2,23 @@
  * Qlik script keywords extracted from the official BNF grammar
  * (GetBaseBNF qBnfType="S").
  *
+ * Static lists are pre-extracted at build time (see scripts/extract-bnf-keywords.mjs)
+ * and can optionally be refreshed at runtime via the Engine API.
+ *
  * These are used by the regex-based syntax highlighter.
- * Sorted alphabetically within each category.
  */
 
-/**
- * Script statement keywords (qScriptStatement=true in BNF).
- *
- * @type {Set<string>}
- */
-export const STATEMENT_KEYWORDS = new Set([
-    'Add',
-    'Alias',
-    'AutoGenerate',
-    'Binary',
-    'Buffer',
-    'Bundle',
-    'Call',
-    'Comment',
-    'Concatenate',
-    'Connect',
-    'CrossTable',
-    'Custom',
-    'Declare',
-    'Derive',
-    'Direct',
-    'Directory',
-    'Disconnect',
-    'Drop',
-    'Execute',
-    'First',
-    'FlushLog',
-    'Force',
-    'Generic',
-    'Hierarchy',
-    'Image_Size',
-    'Info',
-    'Inner',
-    'IntervalMatch',
-    'Join',
-    'Keep',
-    'Left',
-    'Let',
-    'Load',
-    'Loosen',
-    'Map',
-    'Merge',
-    'NoConcatenate',
-    'Noconcatenate',
-    'Outer',
-    'Qualify',
-    'Rem',
-    'Rename',
-    'Replace',
-    'Right',
-    'Section',
-    'Select',
-    'Semantic',
-    'Set',
-    'Sleep',
-    'SQL',
-    'SQLColumns',
-    'SQLTables',
-    'SQLTypes',
-    'Star',
-    'Store',
-    'Tag',
-    'Trace',
-    'Unmap',
-    'Unqualify',
-    'Untag',
-]);
+import {
+    STATEMENT_KEYWORDS,
+    CONTROL_KEYWORDS,
+    FUNCTIONS,
+    AGGR_FUNCTIONS,
+    DEPRECATED_NAMES,
+} from './bnf-static-data.js';
 
 /**
- * Control statement keywords (qControlStatement=true in BNF).
- *
- * @type {Set<string>}
- */
-export const CONTROL_KEYWORDS = new Set([
-    'Call',
-    'Case',
-    'Default',
-    'Do',
-    'Else',
-    'ElseIf',
-    'End',
-    'EndIf',
-    'EndSub',
-    'EndSwitch',
-    'Exit',
-    'For',
-    'If',
-    'Loop',
-    'Next',
-    'Script',
-    'Sub',
-    'Switch',
-    'Then',
-    'Until',
-    'While',
-]);
-
-/**
- * Sub-keywords used in statement/control contexts.
+ * Sub-keywords used in statement/control contexts that are not in the BNF
+ * as explicit statement or control markers, but are important for highlighting.
  *
  * @type {Set<string>}
  */
@@ -144,222 +58,69 @@ export const SUB_KEYWORDS = new Set([
 
 /**
  * All keywords combined (for case-insensitive lookup).
+ * Built from BNF-parsed statement + control keywords plus sub-keywords.
  *
  * @type {Set<string>}
  */
-export const ALL_KEYWORDS = new Set([
-    ...Array.from(STATEMENT_KEYWORDS).map((k) => k.toLowerCase()),
-    ...Array.from(CONTROL_KEYWORDS).map((k) => k.toLowerCase()),
+/** Static keyword set (lowercase) built from pre-extracted BNF data. */
+const staticKeywords = new Set([
+    ...STATEMENT_KEYWORDS.map((k) => k.toLowerCase()),
+    ...CONTROL_KEYWORDS.map((k) => k.toLowerCase()),
     ...Array.from(SUB_KEYWORDS).map((k) => k.toLowerCase()),
 ]);
 
-/**
- * Built-in function names extracted from BNF (qQvFunc=true).
- * This is a representative subset; the full list has 344 unique names.
- *
- * @type {Set<string>}
- */
-export const FUNCTIONS = new Set([
-    // Aggregation
-    'Avg',
-    'Correl',
-    'Count',
-    'FirstSortedValue',
-    'Max',
-    'Median',
-    'Min',
-    'Mode',
-    'Only',
-    'Percentile',
-    'Stdev',
-    'Sum',
-    // String
-    'Capitalize',
-    'Chr',
-    'Concat',
-    'Hash128',
-    'Hash160',
-    'Hash256',
-    'Index',
-    'KeepChar',
-    'Left',
-    'Len',
-    'Lower',
-    'LTrim',
-    'Mid',
-    'Ord',
-    'PurgeChar',
-    'Repeat',
-    'Replace',
-    'Right',
-    'RTrim',
-    'SubField',
-    'SubStringCount',
-    'TextBetween',
-    'Trim',
-    'Upper',
-    // Date/Time
-    'AddMonths',
-    'AddYears',
-    'Age',
-    'ConvertToLocalTime',
-    'Date',
-    'Date#',
-    'Day',
-    'DayEnd',
-    'DayName',
-    'DayNumberOfQuarter',
-    'DayNumberOfYear',
-    'DayStart',
-    'Hour',
-    'InDay',
-    'InMonth',
-    'InQuarter',
-    'InWeek',
-    'InYear',
-    'LocalTime',
-    'MakeDate',
-    'MakeTime',
-    'Minute',
-    'Month',
-    'MonthEnd',
-    'MonthName',
-    'MonthStart',
-    'Now',
-    'QuarterEnd',
-    'QuarterName',
-    'QuarterStart',
-    'Second',
-    'SetDateYear',
-    'Time',
-    'Time#',
-    'Timestamp',
-    'Timestamp#',
-    'Today',
-    'Week',
-    'WeekDay',
-    'WeekEnd',
-    'WeekName',
-    'WeekStart',
-    'WeekYear',
-    'Year',
-    'YearEnd',
-    'YearName',
-    'YearStart',
-    'YearToDate',
-    // Math
-    'Abs',
-    'Acos',
-    'Asin',
-    'Atan',
-    'Atan2',
-    'Ceil',
-    'Cos',
-    'Div',
-    'Exp',
-    'Fabs',
-    'Fact',
-    'Floor',
-    'Fmod',
-    'Frac',
-    'Log',
-    'Log10',
-    'Mod',
-    'Pow',
-    'Round',
-    'Sign',
-    'Sin',
-    'Sqrt',
-    'Tan',
-    // Conditional
-    'Alt',
-    'Class',
-    'Coalesce',
-    'If',
-    'Match',
-    'MixMatch',
-    'Pick',
-    'WildMatch',
-    // System
-    'ComputerName',
-    'DocumentName',
-    'DocumentPath',
-    'DocumentTitle',
-    'GetActiveSheetId',
-    'GetExtendedProperty',
-    'GetObjectField',
-    'GetRegistryString',
-    'IsPartialReload',
-    'OSUser',
-    'ReloadTime',
-    'StateName',
-    // Color
-    'ARGB',
-    'Color',
-    'ColorMapHue',
-    'ColorMapJet',
-    'ColorMix1',
-    'ColorMix2',
-    'HSL',
-    'RGB',
-    // Mapping / Inter-record
-    'ApplyMap',
-    'MapSubstring',
-    'Exists',
-    'FieldIndex',
-    'FieldValue',
-    'FieldValueCount',
-    'Lookup',
-    'Peek',
-    'Previous',
-    // Type / Null
-    'IsNull',
-    'IsNum',
-    'IsText',
-    'Null',
-    'Num',
-    'Num#',
-    'Text',
-    'Dual',
-    // Range
-    'RangeAvg',
-    'RangeCount',
-    'RangeMax',
-    'RangeMin',
-    'RangeMode',
-    'RangeOnly',
-    'RangeSkew',
-    'RangeStdev',
-    'RangeSum',
-    // File
-    'Attribute',
-    'ConnectString',
-    'FileBaseName',
-    'FileDir',
-    'FileExtension',
-    'FileName',
-    'FilePath',
-    'FileSize',
-    'FileTime',
-    'GetFolderPath',
-    'QvdCreateTime',
-    'QvdFieldName',
-    'QvdNoOfFields',
-    'QvdNoOfRecords',
-    'QvdTableName',
-    // Table
-    'FieldName',
-    'FieldNumber',
-    'NoOfFields',
-    'NoOfRows',
-    'NoOfTables',
-    'TableName',
-    'TableNumber',
+/** Static function set (lowercase). */
+const staticFunctions = new Set([
+    ...FUNCTIONS.map((f) => f.toLowerCase()),
+    ...AGGR_FUNCTIONS.map((f) => f.toLowerCase()),
 ]);
+
+/** Static deprecated set (lowercase). */
+const staticDeprecated = new Set(DEPRECATED_NAMES.map((d) => d.toLowerCase()));
+
+export let ALL_KEYWORDS = new Set(staticKeywords);
 
 /**
  * All function names in lowercase for case-insensitive matching.
+ * Built from BNF-parsed function + aggregation function lists.
  *
  * @type {Set<string>}
  */
-export const ALL_FUNCTIONS = new Set(Array.from(FUNCTIONS).map((f) => f.toLowerCase()));
+export let ALL_FUNCTIONS = new Set(staticFunctions);
+
+/**
+ * Deprecated function/keyword names in lowercase.
+ *
+ * @type {Set<string>}
+ */
+export let DEPRECATED = new Set(staticDeprecated);
+
+/**
+ * Replace the keyword and function sets with runtime BNF data.
+ *
+ * Called when the runtime BNF loader successfully fetches fresh data
+ * from the Qlik Engine API.
+ *
+ * @param {import('./bnf-parser.js').BnfKeywordSets} runtimeSets - Parsed runtime BNF data.
+ *
+ * @returns {void}
+ */
+export function applyRuntimeBnf(runtimeSets) {
+    ALL_KEYWORDS = new Set([
+        ...runtimeSets.allKeywords,
+        ...Array.from(SUB_KEYWORDS).map((k) => k.toLowerCase()),
+    ]);
+    ALL_FUNCTIONS = runtimeSets.allFunctions;
+    DEPRECATED = runtimeSets.deprecatedLower;
+}
+
+/**
+ * Reset keyword and function sets to the static BNF data.
+ *
+ * @returns {void}
+ */
+export function resetToStaticBnf() {
+    ALL_KEYWORDS = new Set(staticKeywords);
+    ALL_FUNCTIONS = new Set(staticFunctions);
+    DEPRECATED = new Set(staticDeprecated);
+}
