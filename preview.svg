@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">
+  <defs>
+    <linearGradient id="iconGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7B2D8E"/>
+      <stop offset="100%" stop-color="#5B1A6E"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5EBF8"/>
+      <stop offset="100%" stop-color="#E8D5F0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Card background with rounded corners -->
+  <rect x="4" y="4" width="132" height="132" rx="16" ry="16" fill="url(#bgGrad)"/>
+
+  <!-- Icon circle -->
+  <circle cx="70" cy="58" r="34" fill="url(#iconGrad)"/>
+
+  <!-- Magnifying glass body -->
+  <circle cx="65" cy="54" r="14" fill="none" stroke="#ffffff" stroke-width="3"/>
+  <!-- Magnifying glass handle -->
+  <line x1="75" y1="64" x2="84" y2="73" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Code lines inside magnifying glass -->
+  <line x1="57" y1="50" x2="67" y2="50" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="57" y1="54" x2="73" y2="54" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+  <line x1="57" y1="58" x2="65" y2="58" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Extension name text -->
+  <text x="70" y="110" text-anchor="middle"
+        font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="12" font-weight="600" fill="#7B2D8E">
+    QvsView.qs
+  </text>
+</svg>
