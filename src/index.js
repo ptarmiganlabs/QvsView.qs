@@ -14,6 +14,7 @@ import {
     useLayout,
     useEffect,
     useModel,
+    useApp,
     useState,
     onContextMenu,
 } from '@nebula.js/stardust';
@@ -53,6 +54,7 @@ export default function supernova(_galaxy) {
         component() {
             const layout = useLayout();
             const model = useModel();
+            const app = useApp();
             const element = useElement();
             const [script, setScript] = useState(null);
             const [bnfReady, setBnfReady] = useState(false);
@@ -81,11 +83,27 @@ export default function supernova(_galaxy) {
                 }
             }, [layout?.viewer?.useRuntimeBnf]);
 
-            // Fetch all hypercube data (with pagination for large scripts)
+            // Fetch script data — prefer GetTableData (preserves empty/duplicate rows)
             useEffect(() => {
                 if (!layout || !model) return;
-                fetchAllRows(layout, model).then(setScript);
-            }, [layout, model]);
+
+                /**
+                 * Load script text, preferring GetTableData over hypercube.
+                 *
+                 * @returns {Promise<string|null>} Script text or null.
+                 */
+                const load = async () => {
+                    // Try GetTableData first (preserves row order and duplicates)
+                    if (app) {
+                        const result = await fetchViaTableData(app, layout);
+                        if (result) return result;
+                    }
+                    // Fall back to hypercube (deduplicates, but works everywhere)
+                    return fetchAllRows(layout, model);
+                };
+
+                load().then(setScript);
+            }, [layout, model, app]);
 
             // Add "Copy selected text" to the right-click context menu
             onContextMenu((menu) => {
@@ -130,11 +148,81 @@ export default function supernova(_galaxy) {
 }
 
 /**
+ * Fetch script text using GetTableData (preserves duplicate/empty rows).
+ *
+ * Unlike the hypercube, GetTableData returns raw table data from the data
+ * model without deduplication, so identical or empty text lines are preserved.
+ *
+ * @param {object} app - Qlik Doc API (from useApp hook).
+ * @param {object} layout - Qlik Sense layout object.
+ *
+ * @returns {Promise<string|null>} The combined script text, or null on failure.
+ */
+async function fetchViaTableData(app, layout) {
+    const hc = layout?.qHyperCube;
+    if (!hc) return null;
+
+    const dimInfo = hc.qDimensionInfo?.[0];
+    if (!dimInfo) return null;
+
+    // Extract the field name from the dimension definition
+    let fieldName = dimInfo.qGroupFieldDefs?.[0] || dimInfo.qFallbackTitle;
+    if (!fieldName) return null;
+
+    // Strip expression prefix and brackets: "=[Line]" -> "Line"
+    fieldName = fieldName.replace(/^=/, '').replace(/^\[|\]$/g, '');
+
+    try {
+        // Get table/field mapping from the data model
+        const { qtr: tables } = await app.getTablesAndKeys(
+            { qcx: 0, qcy: 0 },
+            { qcx: 0, qcy: 0 },
+            0,
+            true,
+            false
+        );
+
+        // Find the table that contains our field
+        let tableName = null;
+        let fieldIndex = 0;
+        let totalRows = 0;
+
+        for (const table of tables || []) {
+            const idx = (table.qFields || []).findIndex((f) => f.qName === fieldName);
+            if (idx >= 0) {
+                tableName = table.qName;
+                fieldIndex = idx;
+                totalRows = table.qNoOfRows;
+                break;
+            }
+        }
+
+        if (!tableName || totalRows === 0) {
+            logger.debug(`GetTableData: field "${fieldName}" not found in any table`);
+            return null;
+        }
+
+        // Fetch all rows — GetTableData preserves duplicates and order
+        const rows = await app.getTableData(0, totalRows, true, tableName);
+
+        const lines = (rows || []).map((row) => {
+            const values = row.qValue || [];
+            return values[fieldIndex]?.qText ?? '';
+        });
+
+        logger.info(`GetTableData: ${lines.length} rows from "${tableName}.${fieldName}"`);
+        return lines.length > 0 ? lines.join('\n') : null;
+    } catch (err) {
+        logger.warn('GetTableData failed:', err);
+        return null;
+    }
+}
+
+/**
  * Fetch all rows from the hypercube, paginating if necessary.
  *
- * The initial data fetch (from qInitialDataFetch) is included in the layout.
- * If the total row count exceeds what was fetched, additional pages are
- * requested via GetHyperCubeData.
+ * Fallback method when GetTableData is unavailable. Note: the hypercube
+ * deduplicates dimension values, so identical/empty lines may be collapsed.
  *
  * @param {object} layout - Qlik Sense layout object.
  * @param {object} model - Qlik engine model (GenericObject).
