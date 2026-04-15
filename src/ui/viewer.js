@@ -40,8 +40,6 @@ function injectCSS() {
  * @returns {string} HTML string for the tab bar.
  */
 function buildTabBar(sections, activeIndex) {
-    if (sections.length <= 1) return '';
-
     const tabs = sections
         .map(
             (s, i) =>

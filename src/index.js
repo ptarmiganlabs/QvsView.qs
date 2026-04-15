@@ -155,8 +155,8 @@ async function fetchAllRows(layout, model) {
         for (const page of pages) {
             if (page.qMatrix) {
                 for (const row of page.qMatrix) {
-                    if (row.length > 0 && row[0]?.qText != null) {
-                        lines.push(row[0].qText);
+                    if (row.length > 0) {
+                        lines.push(row[0]?.qText ?? '');
                     }
                 }
             }
@@ -180,8 +180,8 @@ async function fetchAllRows(layout, model) {
             const matrix = dataPages[0].qMatrix;
             if (!matrix || matrix.length === 0) break;
             for (const row of matrix) {
-                if (row.length > 0 && row[0]?.qText != null) {
-                    lines.push(row[0].qText);
+                if (row.length > 0) {
+                    lines.push(row[0]?.qText ?? '');
                 }
             }
             fetched = lines.length;
