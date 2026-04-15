@@ -135,12 +135,16 @@ export default function supernova(_galaxy) {
                 }
 
                 const viewerOpts = layout.viewer || {};
+                const toolbarOpts = layout.toolbar || {};
 
                 renderViewer(element, {
                     script,
                     showLineNumbers: viewerOpts.showLineNumbers !== false,
                     wordWrap: viewerOpts.wordWrap === true,
                     fontSize: viewerOpts.fontSize || 13,
+                    enableFolding: viewerOpts.enableFolding !== false,
+                    showCopyButton: toolbarOpts.showCopyButton !== false,
+                    showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
                 });
             }, [layout, element, script, bnfReady]);
         },

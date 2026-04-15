@@ -10,6 +10,7 @@ import { tokenize, renderTokensToHTML } from '../syntax/highlighter.js';
 import { buildTokenCSS } from '../syntax/tokens.js';
 import { parseSections } from '../sections.js';
 import { buildSearchBar, findMatchOffsets, highlightMatches, scrollToMatch } from './search.js';
+import { detectFoldRanges, buildFoldMap } from '../syntax/fold-detector.js';
 
 const CSS_PREFIX = 'qvs';
 
@@ -62,14 +63,31 @@ function modKey() {
 }
 
 /**
- * Build the toolbar HTML (copy button + search hint).
+ * Build the toolbar HTML (copy button + search hint + optional font size dropdown).
+ *
+ * @param {object} toolbarOpts - Toolbar display options.
+ * @param {boolean} toolbarOpts.showCopyButton - Whether to show the copy button.
+ * @param {boolean} toolbarOpts.showFontSizeDropdown - Whether to show the font size dropdown.
+ * @param {number} toolbarOpts.fontSize - Current font size value.
  *
  * @returns {string} HTML string for the toolbar.
  */
-function buildToolbar() {
+function buildToolbar(toolbarOpts) {
+    const { showCopyButton = true, showFontSizeDropdown = false, fontSize = 13 } = toolbarOpts;
+
+    const sizes = [10, 11, 12, 13, 14, 16, 18, 20];
+    const fontSizeHTML = showFontSizeDropdown
+        ? `<select class="${CSS_PREFIX}-fontsize-select" title="Font size">${sizes.map((s) => `<option value="${s}"${s === fontSize ? ' selected' : ''}>${s}px</option>`).join('')}</select>`
+        : '';
+
+    const copyHTML = showCopyButton
+        ? `<button class="${CSS_PREFIX}-copy-btn" title="Copy to clipboard">&#128203; Copy</button>`
+        : '';
+
     return `<div class="${CSS_PREFIX}-toolbar">
+        ${fontSizeHTML}
         <span class="${CSS_PREFIX}-search-hint" title="Open search">${modKey()}+F</span>
-        <button class="${CSS_PREFIX}-copy-btn" title="Copy to clipboard">&#128203; Copy</button>
+        ${copyHTML}
     </div>`;
 }
 
@@ -91,7 +109,15 @@ function buildToolbar() {
 export function renderViewer(element, options) {
     injectCSS();
 
-    const { script, showLineNumbers = true, wordWrap = false, fontSize = 13 } = options;
+    const {
+        script,
+        showLineNumbers = true,
+        wordWrap = false,
+        fontSize = 13,
+        enableFolding = true,
+        showCopyButton = true,
+        showFontSizeDropdown = false,
+    } = options;
 
     const sections = parseSections(script);
 
@@ -106,6 +132,9 @@ export function renderViewer(element, options) {
         wordWrap,
         fontSize,
         fullScript: script,
+        enableFolding,
+        showCopyButton,
+        showFontSizeDropdown,
     });
 }
 
@@ -120,21 +149,105 @@ export function renderViewer(element, options) {
  * @param {boolean} opts.wordWrap - Wrap long lines.
  * @param {number} opts.fontSize - Font size in pixels.
  * @param {string} opts.fullScript - The complete script text (for "copy all").
+ * @param {boolean} opts.enableFolding - Whether code folding is enabled.
+ * @param {boolean} opts.showCopyButton - Whether to show the copy button.
+ * @param {boolean} opts.showFontSizeDropdown - Whether to show the font size dropdown.
  *
  * @returns {void}
  */
 function renderSection(element, opts) {
-    const { sections, activeIndex, showLineNumbers, wordWrap, fontSize, fullScript } = opts;
+    const {
+        sections,
+        activeIndex,
+        showLineNumbers,
+        wordWrap,
+        fontSize,
+        fullScript,
+        enableFolding,
+        showCopyButton,
+        showFontSizeDropdown,
+    } = opts;
 
     const section = sections[activeIndex];
     const sectionScript = section.content;
 
     const tokenizedLines = tokenize(sectionScript);
-    let codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
+    const codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
     const lineCount = tokenizedLines.length;
     const lineOffset = section.startLine + (sections.length > 1 ? 1 : 0); // offset for ///$tab line
 
     const wrapClass = wordWrap ? `${CSS_PREFIX}-wrap` : '';
+
+    // ── Fold detection ──
+    let foldMap = new Map();
+    if (enableFolding) {
+        const ranges = detectFoldRanges(tokenizedLines);
+        foldMap = buildFoldMap(ranges);
+    }
+
+    // Restore fold state from element dataset
+    const foldState = parseFoldState(element.dataset.qvsFoldState);
+
+    // Determine which lines are hidden (inside a collapsed fold)
+    const hiddenLines = new Set();
+    if (enableFolding) {
+        for (const [startLine, range] of foldMap) {
+            if (foldState.has(startLine)) {
+                for (let i = startLine + 1; i <= range.endLine; i++) {
+                    hiddenLines.add(i);
+                }
+            }
+        }
+    }
+
+    // ── Build per-line gutter ──
+    let gutterHTML = '';
+    if (showLineNumbers) {
+        const gutterLines = [];
+        for (let i = 0; i < lineCount; i++) {
+            const hidden = hiddenLines.has(i) ? ` ${CSS_PREFIX}-gutter-line-hidden` : '';
+            gutterLines.push(
+                `<div class="${CSS_PREFIX}-gutter-line${hidden}">${lineOffset + i + 1}</div>`
+            );
+            // Insert spacer to match fold placeholder in code area
+            if (enableFolding && foldState.has(i) && foldMap.has(i)) {
+                gutterLines.push(`<div class="${CSS_PREFIX}-fold-placeholder-spacer"></div>`);
+            }
+        }
+        gutterHTML = `<div class="${CSS_PREFIX}-gutter" style="font-size:${fontSize}px">${gutterLines.join('')}</div>`;
+    }
+
+    // ── Build fold gutter ──
+    let foldGutterHTML = '';
+    if (enableFolding) {
+        const foldLines = [];
+        for (let i = 0; i < lineCount; i++) {
+            const hidden = hiddenLines.has(i) ? ` ${CSS_PREFIX}-fold-line-hidden` : '';
+            const range = foldMap.get(i);
+            if (range) {
+                const collapsed = foldState.has(i);
+                const icon = collapsed ? '\u25B6' : '\u25BC';
+                const count = range.endLine - range.startLine;
+                const title = collapsed ? `Expand (${count} lines)` : `Collapse (${count} lines)`;
+                foldLines.push(
+                    `<div class="${CSS_PREFIX}-fold-line${hidden}" data-fold-start="${i}" title="${title}"><span class="${CSS_PREFIX}-fold-icon">${icon}</span></div>`
+                );
+            } else {
+                foldLines.push(`<div class="${CSS_PREFIX}-fold-line${hidden}">&nbsp;</div>`);
+            }
+            // Insert spacer to match fold placeholder in code area
+            if (foldState.has(i) && foldMap.has(i)) {
+                foldLines.push(`<div class="${CSS_PREFIX}-fold-placeholder-spacer"></div>`);
+            }
+        }
+        foldGutterHTML = `<div class="${CSS_PREFIX}-fold-gutter" style="font-size:${fontSize}px">${foldLines.join('')}</div>`;
+    }
+
+    // ── Apply hidden state and fold placeholders to code HTML ──
+    let finalCodeHTML = codeHTML;
+    if (enableFolding && hiddenLines.size > 0) {
+        finalCodeHTML = injectFoldPlaceholders(codeHTML, foldMap, foldState, hiddenLines);
+    }
 
     // ── Search highlight injection ──
     const searchQuery = element.dataset.qvsSearchQuery || '';
@@ -149,16 +262,27 @@ function renderSection(element, opts) {
         element.dataset.qvsSearchMatch = String(activeMatchIndex);
 
         if (matches.length > 0) {
-            codeHTML = highlightMatches(codeHTML, sectionScript, matches, activeMatchIndex);
+            // Auto-expand collapsed regions containing matches
+            if (enableFolding) {
+                autoExpandForMatches(matches, sectionScript, foldMap, foldState, hiddenLines);
+                saveFoldState(element, foldState);
+                // Re-render if we expanded anything
+                if (hiddenLines.size === 0) {
+                    finalCodeHTML = codeHTML;
+                }
+            }
+            finalCodeHTML = highlightMatches(
+                finalCodeHTML,
+                sectionScript,
+                matches,
+                activeMatchIndex
+            );
         }
     }
 
-    // Build line numbers gutter (use global line numbers)
-    let gutterHTML = '';
-    if (showLineNumbers) {
-        const numbers = Array.from({ length: lineCount }, (_, i) => lineOffset + i + 1).join('\n');
-        gutterHTML = `<pre class="${CSS_PREFIX}-gutter" style="font-size:${fontSize}px">${numbers}</pre>`;
-    }
+    // ── Save scroll position before re-render ──
+    const prevViewer = element.querySelector(`.${CSS_PREFIX}-viewer`);
+    const savedScrollTop = prevViewer ? prevViewer.scrollTop : 0;
 
     element.dataset.qvsActiveSection = String(activeIndex);
 
@@ -166,19 +290,27 @@ function renderSection(element, opts) {
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
                 ${buildTabBar(sections, activeIndex)}
-                ${buildToolbar()}
+                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize })}
             </div>
             ${searchActive ? buildSearchBar(searchQuery, activeMatchIndex, matches.length) : ''}
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
+              <div class="${CSS_PREFIX}-viewer-inner">
                 ${gutterHTML}
-                <pre class="${CSS_PREFIX}-code" style="font-size:${fontSize}px"><code>${codeHTML}</code></pre>
+                ${foldGutterHTML}
+                <pre class="${CSS_PREFIX}-code" style="font-size:${fontSize}px"><code>${finalCodeHTML}</code></pre>
+              </div>
             </div>
         </div>
     `;
 
+    // ── Restore scroll position ──
+    const viewer = element.querySelector(`.${CSS_PREFIX}-viewer`);
+    if (viewer && savedScrollTop) {
+        viewer.scrollTop = savedScrollTop;
+    }
+
     // Scroll to active match after render
     if (searchActive && matches.length > 0) {
-        const viewer = element.querySelector(`.${CSS_PREFIX}-viewer`);
         if (viewer) scrollToMatch(viewer, activeMatchIndex);
     }
 
@@ -189,11 +321,46 @@ function renderSection(element, opts) {
         btn.addEventListener('click', (e) => {
             const idx = parseInt(e.currentTarget.dataset.sectionIndex, 10);
             if (idx === activeIndex) return;
-            // Reset match index when switching tabs
+            // Reset match index and fold state when switching tabs
             element.dataset.qvsSearchMatch = '0';
+            element.dataset.qvsFoldState = '';
             renderSection(element, { ...opts, activeIndex: idx });
         });
     });
+
+    // Fold gutter click handler (event delegation)
+    if (enableFolding) {
+        const foldGutter = element.querySelector(`.${CSS_PREFIX}-fold-gutter`);
+        if (foldGutter) {
+            foldGutter.addEventListener('click', (e) => {
+                const foldLine = e.target.closest(`[data-fold-start]`);
+                if (!foldLine) return;
+
+                const startLine = parseInt(foldLine.dataset.foldStart, 10);
+                if (Number.isNaN(startLine)) return;
+
+                // Toggle fold state
+                if (foldState.has(startLine)) {
+                    foldState.delete(startLine);
+                } else {
+                    foldState.add(startLine);
+                }
+                saveFoldState(element, foldState);
+                renderSection(element, opts);
+            });
+        }
+
+        // Fold placeholder click handler (expand on click)
+        element.querySelectorAll(`.${CSS_PREFIX}-fold-placeholder`).forEach((ph) => {
+            ph.addEventListener('click', () => {
+                const startLine = parseInt(ph.dataset.foldStart, 10);
+                if (Number.isNaN(startLine)) return;
+                foldState.delete(startLine);
+                saveFoldState(element, foldState);
+                renderSection(element, opts);
+            });
+        });
+    }
 
     // Copy button handler
     const copyBtn = element.querySelector(`.${CSS_PREFIX}-copy-btn`);
@@ -210,6 +377,17 @@ function renderSection(element, opts) {
                     copyBtn.textContent = 'Failed';
                 }
             );
+        });
+    }
+
+    // Font size dropdown handler
+    const fontSizeSelect = element.querySelector(`.${CSS_PREFIX}-fontsize-select`);
+    if (fontSizeSelect) {
+        fontSizeSelect.addEventListener('change', () => {
+            const newSize = parseInt(fontSizeSelect.value, 10);
+            if (!Number.isNaN(newSize)) {
+                renderSection(element, { ...opts, fontSize: newSize });
+            }
         });
     }
 
@@ -419,4 +597,139 @@ function escapeHTML(text) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+// ── Fold state helpers ──
+
+/**
+ * Parse fold state from a dataset string into a Set of collapsed startLine numbers.
+ *
+ * @param {string} [raw] - Comma-separated startLine numbers, or empty/undefined.
+ *
+ * @returns {Set<number>} Set of collapsed startLine indices.
+ */
+function parseFoldState(raw) {
+    if (!raw) return new Set();
+    return new Set(
+        raw
+            .split(',')
+            .map(Number)
+            .filter((n) => !Number.isNaN(n))
+    );
+}
+
+/**
+ * Save fold state to element dataset as a comma-separated string.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {Set<number>} foldState - Set of collapsed startLine indices.
+ *
+ * @returns {void}
+ */
+function saveFoldState(element, foldState) {
+    element.dataset.qvsFoldState = Array.from(foldState).join(',');
+}
+
+/**
+ * Process per-line code HTML to hide collapsed lines and inject fold placeholders.
+ *
+ * Walks the per-line `<div>` elements and adds a hidden class to lines inside
+ * collapsed ranges, then inserts a clickable placeholder after the fold start line.
+ *
+ * @param {string} codeHTML - Per-line div HTML from renderTokensToHTML.
+ * @param {Map<number, import('../syntax/fold-detector.js').FoldRange>} foldMap - Fold ranges by startLine.
+ * @param {Set<number>} foldState - Set of collapsed startLine indices.
+ * @param {Set<number>} hiddenLines - Set of hidden line indices.
+ *
+ * @returns {string} Modified HTML with hidden lines and placeholders.
+ */
+function injectFoldPlaceholders(codeHTML, foldMap, foldState, hiddenLines) {
+    // Collect all per-line div start positions first, then slice between them.
+    const lineRegex = new RegExp(`<div class="${CSS_PREFIX}-line"(?: [^>]*)?>`, 'g');
+    const starts = [];
+    let m;
+    while ((m = lineRegex.exec(codeHTML)) !== null) {
+        starts.push(m.index);
+    }
+    if (starts.length === 0) return codeHTML;
+
+    const parts = [];
+    for (let i = 0; i < starts.length; i++) {
+        const divEnd = i + 1 < starts.length ? starts[i + 1] : codeHTML.length;
+        const lineHTML = codeHTML.substring(starts[i], divEnd);
+
+        if (hiddenLines.has(i)) {
+            // Add hidden class to this line's div
+            parts.push(
+                lineHTML.replace(
+                    `${CSS_PREFIX}-line`,
+                    `${CSS_PREFIX}-line ${CSS_PREFIX}-line-hidden`
+                )
+            );
+        } else {
+            parts.push(lineHTML);
+        }
+
+        // After a fold start line, insert the placeholder
+        if (foldState.has(i) && foldMap.has(i)) {
+            const range = foldMap.get(i);
+            const count = range.endLine - range.startLine;
+            parts.push(
+                `<div class="${CSS_PREFIX}-fold-placeholder" data-fold-start="${i}">` +
+                    `<span class="${CSS_PREFIX}-fold-placeholder-text">\u2026 ${count} lines collapsed (${escapeHTML(range.label)})</span>` +
+                    `</div>`
+            );
+        }
+    }
+
+    return parts.join('');
+}
+
+/**
+ * Auto-expand collapsed folds that contain search matches.
+ *
+ * @param {{ start: number, end: number }[]} matches - Match offsets in plain text.
+ * @param {string} sectionScript - Plain text of the section.
+ * @param {Map<number, import('../syntax/fold-detector.js').FoldRange>} foldMap - Fold ranges by startLine.
+ * @param {Set<number>} foldState - Mutable set of collapsed startLine indices.
+ * @param {Set<number>} hiddenLines - Mutable set of hidden line indices.
+ *
+ * @returns {void}
+ */
+function autoExpandForMatches(matches, sectionScript, foldMap, foldState, hiddenLines) {
+    // Determine which lines contain matches
+    const lines = sectionScript.split('\n');
+    let charOffset = 0;
+    const lineStarts = [];
+    for (let i = 0; i < lines.length; i++) {
+        lineStarts.push(charOffset);
+        charOffset += lines[i].length + 1; // +1 for \n
+    }
+
+    const matchLines = new Set();
+    for (const m of matches) {
+        // Find which line this match starts on
+        for (let i = lineStarts.length - 1; i >= 0; i--) {
+            if (m.start >= lineStarts[i]) {
+                matchLines.add(i);
+                break;
+            }
+        }
+    }
+
+    // Expand folds containing match lines
+    for (const [startLine, range] of foldMap) {
+        if (!foldState.has(startLine)) continue;
+
+        for (let i = startLine + 1; i <= range.endLine; i++) {
+            if (matchLines.has(i)) {
+                foldState.delete(startLine);
+                // Remove hidden lines for this range
+                for (let j = startLine + 1; j <= range.endLine; j++) {
+                    hiddenLines.delete(j);
+                }
+                break;
+            }
+        }
+    }
 }

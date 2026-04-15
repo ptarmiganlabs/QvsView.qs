@@ -13,6 +13,7 @@
  */
 
 import { viewerSection } from './viewer-section.js';
+import { toolbarSection } from './toolbar-section.js';
 import { aboutSection } from './about-section.js';
 
 /**
@@ -39,6 +40,7 @@ export default function ext(_galaxy) {
                     uses: 'data',
                 },
                 viewerSection: viewerSection(),
+                toolbarSection: toolbarSection(),
                 appearance: {
                     uses: 'settings',
                 },

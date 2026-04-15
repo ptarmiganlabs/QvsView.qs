@@ -21,6 +21,11 @@ export default {
         showLineNumbers: true,
         wordWrap: false,
         fontSize: 13,
+        enableFolding: true,
         useRuntimeBnf: false,
+    },
+    toolbar: {
+        showCopyButton: true,
+        showFontSizeDropdown: false,
     },
 };

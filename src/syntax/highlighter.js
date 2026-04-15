@@ -300,21 +300,26 @@ export function tokenize(script) {
 /**
  * Render tokenized lines as an HTML string with syntax highlighting.
  *
+ * Each line is wrapped in a `<div>` element with a `data-line` attribute
+ * for per-line DOM manipulation (folding, line highlighting, etc.).
+ *
  * @param {Token[][]} tokenizedLines - Output from tokenize().
  * @param {string} prefix - CSS class prefix (e.g., 'qvs').
  *
- * @returns {string} HTML string with token spans.
+ * @returns {string} HTML string with per-line divs and token spans.
  */
 export function renderTokensToHTML(tokenizedLines, prefix) {
     return tokenizedLines
         .map(
-            (tokens) =>
-                tokens
-                    .map((t) => {
-                        const escaped = escapeHTML(t.text);
-                        return `<span class="${prefix}-token-${t.type}">${escaped}</span>`;
-                    })
-                    .join('') || '&nbsp;'
+            (tokens, i) =>
+                `<div class="${prefix}-line" data-line="${i}">${
+                    tokens
+                        .map((t) => {
+                            const escaped = escapeHTML(t.text);
+                            return `<span class="${prefix}-token-${t.type}">${escaped}</span>`;
+                        })
+                        .join('') || '&nbsp;'
+                }</div>`
         )
         .join('\n');
 }

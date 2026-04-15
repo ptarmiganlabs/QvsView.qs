@@ -49,6 +49,20 @@ export function viewerSection() {
                     { value: 20, label: '20' },
                 ],
             },
+            enableFolding: {
+                ref: 'viewer.enableFolding',
+                type: 'boolean',
+                label: 'Code folding',
+                defaultValue: true,
+                component: 'switch',
+                options: [
+                    { value: true, label: 'On' },
+                    { value: false, label: 'Off' },
+                ],
+                description:
+                    'Allow collapsing multi-line LOAD/SELECT statements, ' +
+                    'SUB/END SUB, IF/END IF, FOR/NEXT, block comments, and other code blocks.',
+            },
             useRuntimeBnf: {
                 ref: 'viewer.useRuntimeBnf',
                 type: 'boolean',

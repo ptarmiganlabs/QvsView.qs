@@ -87,6 +87,23 @@
     color: #333;
 }
 
+.qvs-fontsize-select {
+    padding: 2px 4px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    color: #555;
+    cursor: pointer;
+    outline: none;
+}
+
+.qvs-fontsize-select:hover {
+    background: #e8e8e8;
+    color: #333;
+}
+
 .qvs-search-hint {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 10px;
@@ -98,8 +115,6 @@
 
 /* ── Viewer container ── */
 .qvs-viewer {
-    display: flex;
-    flex-direction: row;
     width: 100%;
     flex: 1 1 auto;
     overflow: auto;
@@ -107,6 +122,12 @@
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     line-height: 1.5;
     box-sizing: border-box;
+}
+
+.qvs-viewer-inner {
+    display: flex;
+    flex-direction: row;
+    min-height: 100%;
 }
 
 /* ── Line numbers gutter ── */
@@ -120,8 +141,7 @@
     border-right: 1px solid #ddd;
     -webkit-user-select: none;
     user-select: none;
-    white-space: pre;
-    overflow: hidden;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
 /* ── Code area ── */
@@ -138,24 +158,27 @@
     margin: 0;
     padding: 8px 12px;
     overflow-x: auto;
-    white-space: pre;
+    white-space: normal;
     tab-size: 4;
 }
 
 .qvs-code code {
     display: block;
-    white-space: pre;
+    white-space: normal;
 }
 
 /* ── Word wrap mode ── */
-.qvs-wrap .qvs-code {
+.qvs-wrap .qvs-line {
     white-space: pre-wrap;
     word-break: break-all;
 }
 
+.qvs-wrap .qvs-code {
+    white-space: normal;
+}
+
 .qvs-wrap .qvs-code code {
-    white-space: pre-wrap;
-    word-break: break-all;
+    white-space: normal;
 }
 
 /* ── Placeholder (no data) ── */
@@ -256,4 +279,119 @@
     background: rgba(255, 150, 0, 0.6);
     outline: 2px solid #ff9600;
     border-radius: 1px;
+}
+
+/* ── Per-line divs ── */
+.qvs-line {
+    display: block;
+    white-space: pre;
+    min-height: 1.5em;
+    line-height: 1.5;
+}
+
+.qvs-line-hidden {
+    display: none;
+}
+
+/* ── Per-line gutter ── */
+.qvs-gutter {
+    display: flex;
+    flex-direction: column;
+}
+
+.qvs-gutter-line {
+    display: block;
+    height: 1.5em;
+    line-height: 1.5;
+    flex-shrink: 0;
+}
+
+.qvs-gutter-line-hidden {
+    display: none;
+}
+
+/* ── Fold gutter ── */
+.qvs-fold-gutter {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    width: 18px;
+    padding: 8px 0;
+    background: #f0f0f0;
+    border-right: 1px solid #ddd;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.qvs-fold-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5em;
+    line-height: 1.5;
+    flex-shrink: 0;
+    cursor: default;
+}
+
+.qvs-fold-line[data-fold-start] {
+    cursor: pointer;
+}
+
+.qvs-fold-line[data-fold-start]:hover {
+    background: #e0e0e0;
+}
+
+.qvs-fold-line-hidden {
+    display: none;
+}
+
+.qvs-fold-icon {
+    font-size: 11px;
+    color: #888;
+    transition: color 0.15s;
+}
+
+.qvs-fold-line:hover .qvs-fold-icon {
+    color: #333;
+}
+
+/* ── Fold placeholder (collapsed region indicator) ── */
+.qvs-fold-placeholder {
+    display: block;
+    padding: 1px 12px;
+    background: #f5f5dc;
+    border: 1px dashed #ccc;
+    border-radius: 3px;
+    margin: 1px 0;
+    cursor: pointer;
+    line-height: 1.5;
+    transition: background 0.15s;
+}
+
+.qvs-fold-placeholder:hover {
+    background: #ececd0;
+    border-color: #aaa;
+}
+
+.qvs-fold-placeholder-text {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    color: #777;
+    font-style: italic;
+}
+
+/* Spacer in gutter/fold-gutter matching fold placeholder height */
+.qvs-fold-placeholder-spacer {
+    display: block;
+    padding: 1px 0;
+    margin: 1px 0;
+    border: 1px solid transparent;
+    line-height: 1.5;
+    visibility: hidden;
+}
+
+.qvs-fold-placeholder-spacer::after {
+    content: '\200b';
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
 }
