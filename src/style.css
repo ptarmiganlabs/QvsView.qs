@@ -118,6 +118,7 @@
     color: #999;
     background: #f0f0f0;
     border-right: 1px solid #ddd;
+    -webkit-user-select: none;
     user-select: none;
     white-space: pre;
     overflow: hidden;
@@ -127,6 +128,7 @@
 /* Qlik Sense sets `* { user-select: none }` globally — override for code */
 .qvs-code,
 .qvs-code * {
+    -webkit-user-select: text;
     user-select: text;
     cursor: text;
 }
