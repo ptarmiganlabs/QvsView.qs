@@ -21,7 +21,7 @@ import {
 import ext from './ext/index.js';
 import data from './data.js';
 import definition from './object-properties.js';
-import { renderViewer, renderPlaceholder } from './ui/viewer.js';
+import { renderViewer, renderPlaceholder, renderWarning } from './ui/viewer.js';
 import { applyRuntimeBnf, resetToStaticBnf } from './syntax/keywords.js';
 import { fetchRuntimeBnf, clearBnfCache } from './syntax/bnf-loader.js';
 import logger, { PACKAGE_VERSION, BUILD_DATE } from './util/logger.js';
@@ -56,7 +56,14 @@ export default function supernova(_galaxy) {
             const model = useModel();
             const app = useApp();
             const element = useElement();
-            const [script, setScript] = useState(null);
+
+            /**
+             * Raw row data from GetTableData. Contains per-row identifiers
+             * when a second dimension is configured, enabling client-side
+             * filtering based on hypercube selection state.
+             */
+            const [rawRows, setRawRows] = useState(null);
+            const [activeIds, setActiveIds] = useState(null);
             const [bnfReady, setBnfReady] = useState(false);
 
             useEffect(() => {
@@ -83,14 +90,16 @@ export default function supernova(_galaxy) {
                 }
             }, [layout?.viewer?.useRuntimeBnf]);
 
-            // Fetch script data — prefer GetTableData (preserves empty/duplicate rows)
+            // Fetch raw row data — prefer GetTableData (preserves empty/duplicate rows)
             useEffect(() => {
                 if (!layout || !model) return;
 
                 /**
-                 * Load script text, preferring GetTableData over hypercube.
+                 * Load raw row data, preferring GetTableData over hypercube.
+                 * Returns per-row objects with text and optional identifier.
                  *
-                 * @returns {Promise<string|null>} Script text or null.
+                 * @returns {Promise<Array<{text: string, id: string|null}>|null>}
+                 *   Array of row objects, or null if no data.
                  */
                 const load = async () => {
                     // Try GetTableData first (preserves row order and duplicates)
@@ -102,7 +111,14 @@ export default function supernova(_galaxy) {
                     return fetchAllRows(layout, model);
                 };
 
-                load().then(setScript);
+                load().then(setRawRows);
+
+                // Also fetch active identifiers from the hypercube
+                if (layout.qHyperCube?.qDimensionInfo?.[1]) {
+                    fetchActiveIdentifiers(layout, model).then(setActiveIds);
+                } else {
+                    setActiveIds(null);
+                }
             }, [layout, model, app]);
 
             // Add "Copy selected text" to the right-click context menu
@@ -125,10 +141,32 @@ export default function supernova(_galaxy) {
                 }
             });
 
-            // Render when script or layout changes
+            // Render when data or layout changes
             useEffect(() => {
                 if (!layout) return;
 
+                if (!rawRows || rawRows.length === 0) {
+                    renderPlaceholder(element);
+                    return;
+                }
+
+                // Multi-app warning: multiple distinct sources after selections
+                if (activeIds && activeIds.length > 1) {
+                    const viewerOpts = layout.viewer || {};
+                    const message =
+                        viewerOpts.multiAppWarningMessage ||
+                        'Multiple scripts detected. Use a filter to select a single script source.';
+                    renderWarning(element, message, activeIds);
+                    return;
+                }
+
+                // Filter raw rows by the active identifier when second dim is present
+                let filteredRows = rawRows;
+                if (activeIds && activeIds.length === 1) {
+                    filteredRows = rawRows.filter((r) => r.id === activeIds[0]);
+                }
+
+                const script = filteredRows.map((r) => r.text).join('\n');
                 if (!script) {
                     renderPlaceholder(element);
                     return;
@@ -146,21 +184,27 @@ export default function supernova(_galaxy) {
                     showCopyButton: toolbarOpts.showCopyButton !== false,
                     showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
                 });
-            }, [layout, element, script, bnfReady]);
+            }, [layout, element, rawRows, activeIds, bnfReady]);
         },
     };
 }
 
 /**
- * Fetch script text using GetTableData (preserves duplicate/empty rows).
+ * Fetch script rows using GetTableData (preserves duplicate/empty rows).
  *
  * Unlike the hypercube, GetTableData returns raw table data from the data
  * model without deduplication, so identical or empty text lines are preserved.
  *
+ * Note: GetTableData is NOT selection-aware — it always returns the full
+ * table contents regardless of user selections. The caller must use the
+ * hypercube (via getActiveIdentifiers) to determine which identifiers are
+ * currently in scope and filter the rows accordingly.
+ *
  * @param {object} app - Qlik Doc API (from useApp hook).
  * @param {object} layout - Qlik Sense layout object.
  *
- * @returns {Promise<string|null>} The combined script text, or null on failure.
+ * @returns {Promise<Array<{text: string, id: string|null}>|null>}
+ *   Array of per-row objects (text + optional identifier), or null on failure.
  */
 async function fetchViaTableData(app, layout) {
     const hc = layout?.qHyperCube;
@@ -176,6 +220,16 @@ async function fetchViaTableData(app, layout) {
     // Strip expression prefix and brackets: "=[Line]" -> "Line"
     fieldName = fieldName.replace(/^=/, '').replace(/^\[|\]$/g, '');
 
+    // Check for optional second dimension (identifier)
+    const idDimInfo = hc.qDimensionInfo?.[1];
+    let idFieldName = null;
+    if (idDimInfo) {
+        idFieldName = idDimInfo.qGroupFieldDefs?.[0] || idDimInfo.qFallbackTitle;
+        if (idFieldName) {
+            idFieldName = idFieldName.replace(/^=/, '').replace(/^\[|\]$/g, '');
+        }
+    }
+
     try {
         // Get table/field mapping from the data model
         const { qtr: tables } = await app.getTablesAndKeys(
@@ -186,7 +240,7 @@ async function fetchViaTableData(app, layout) {
             false
         );
 
-        // Find the table that contains our field
+        // Find the table that contains our script field
         let tableName = null;
         let fieldIndex = 0;
         let totalRows = 0;
@@ -206,16 +260,35 @@ async function fetchViaTableData(app, layout) {
             return null;
         }
 
+        // Find the identifier field index in the same table (if configured)
+        let idFieldIndex = -1;
+        if (idFieldName) {
+            for (const table of tables || []) {
+                if (table.qName === tableName) {
+                    idFieldIndex = (table.qFields || []).findIndex((f) => f.qName === idFieldName);
+                    break;
+                }
+            }
+            if (idFieldIndex < 0) {
+                logger.debug(
+                    `GetTableData: identifier field "${idFieldName}" not in table "${tableName}"`
+                );
+            }
+        }
+
         // Fetch all rows — GetTableData preserves duplicates and order
         const rows = await app.getTableData(0, totalRows, true, tableName);
 
-        const lines = (rows || []).map((row) => {
+        const result = (rows || []).map((row) => {
             const values = row.qValue || [];
-            return values[fieldIndex]?.qText ?? '';
+            return {
+                text: values[fieldIndex]?.qText ?? '',
+                id: idFieldIndex >= 0 ? (values[idFieldIndex]?.qText ?? null) : null,
+            };
         });
 
-        logger.info(`GetTableData: ${lines.length} rows from "${tableName}.${fieldName}"`);
-        return lines.length > 0 ? lines.join('\n') : null;
+        logger.info(`GetTableData: ${result.length} rows from "${tableName}.${fieldName}"`);
+        return result.length > 0 ? result : null;
     } catch (err) {
         logger.warn('GetTableData failed:', err);
         return null;
@@ -227,11 +300,14 @@ async function fetchViaTableData(app, layout) {
  *
  * Fallback method when GetTableData is unavailable. Note: the hypercube
  * deduplicates dimension values, so identical/empty lines may be collapsed.
+ * However, it IS selection-aware — only rows matching active selections
+ * are included.
  *
  * @param {object} layout - Qlik Sense layout object.
  * @param {object} model - Qlik engine model (GenericObject).
  *
- * @returns {Promise<string|null>} The combined script text, or null if no data.
+ * @returns {Promise<Array<{text: string, id: string|null}>|null>}
+ *   Array of per-row objects (text + optional identifier), or null if no data.
  */
 async function fetchAllRows(layout, model) {
     const hc = layout?.qHyperCube;
@@ -240,15 +316,21 @@ async function fetchAllRows(layout, model) {
     const totalRows = hc.qSize?.qcy || 0;
     if (totalRows === 0) return null;
 
+    const colCount = hc.qSize?.qcx || 1;
+    const hasIdentifier = colCount >= 2;
+
     // Collect rows from initial data pages
-    const lines = [];
+    const result = [];
     const pages = hc.qDataPages;
     if (pages) {
         for (const page of pages) {
             if (page.qMatrix) {
                 for (const row of page.qMatrix) {
                     if (row.length > 0) {
-                        lines.push(row[0]?.qText ?? '');
+                        result.push({
+                            text: row[0]?.qText ?? '',
+                            id: hasIdentifier && row.length > 1 ? (row[1]?.qText ?? null) : null,
+                        });
                     }
                 }
             }
@@ -256,32 +338,105 @@ async function fetchAllRows(layout, model) {
     }
 
     // If we already have all rows, we're done
-    if (lines.length >= totalRows) {
-        return lines.length > 0 ? lines.join('\n') : null;
+    if (result.length >= totalRows) {
+        return result.length > 0 ? result : null;
     }
 
     // Fetch remaining pages
-    let fetched = lines.length;
+    let fetched = result.length;
     while (fetched < totalRows) {
         const height = Math.min(PAGE_SIZE, totalRows - fetched);
         try {
             const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
-                { qTop: fetched, qLeft: 0, qWidth: 1, qHeight: height },
+                { qTop: fetched, qLeft: 0, qWidth: colCount, qHeight: height },
             ]);
             if (!dataPages || dataPages.length === 0) break;
             const matrix = dataPages[0].qMatrix;
             if (!matrix || matrix.length === 0) break;
             for (const row of matrix) {
                 if (row.length > 0) {
-                    lines.push(row[0]?.qText ?? '');
+                    result.push({
+                        text: row[0]?.qText ?? '',
+                        id: hasIdentifier && row.length > 1 ? (row[1]?.qText ?? null) : null,
+                    });
                 }
             }
-            fetched = lines.length;
+            fetched = result.length;
         } catch (err) {
             logger.warn('Pagination fetch failed, using partial data:', err);
             break;
         }
     }
 
-    return lines.length > 0 ? lines.join('\n') : null;
+    return result.length > 0 ? result : null;
+}
+
+/**
+ * Fetch the distinct identifier values currently visible in the hypercube.
+ *
+ * The hypercube is selection-aware — when the user selects a value in a
+ * filter pane, only matching rows appear. This makes it the correct source
+ * for determining which script sources are "active".
+ *
+ * First tries the pre-fetched qDataPages in the layout. If those are empty
+ * (which happens when qWidth × qHeight exceeds the 10 000 cell limit, e.g.
+ * on existing objects with qHeight: 10000 and qWidth: 2 = 20 000), falls
+ * back to an explicit getHyperCubeData call to fetch a small page.
+ *
+ * @param {object} layout - Qlik Sense layout object.
+ * @param {object} model - Qlik engine model (GenericObject).
+ *
+ * @returns {Promise<string[]|null>} Distinct identifier values currently
+ *   in scope, or null when no second dimension is configured.
+ */
+async function fetchActiveIdentifiers(layout, model) {
+    const hc = layout?.qHyperCube;
+    if (!hc?.qDimensionInfo?.[1]) return null;
+
+    // Try qDataPages first (fast, no engine round-trip)
+    const idSet = new Set();
+    for (const page of hc.qDataPages || []) {
+        for (const row of page.qMatrix || []) {
+            if (row.length > 1) {
+                const id = row[1]?.qText;
+                if (id != null && id !== '') {
+                    idSet.add(id);
+                }
+            }
+        }
+    }
+
+    if (idSet.size > 0) {
+        return [...idSet];
+    }
+
+    // qDataPages empty — fetch a small page from the engine directly.
+    // We only need enough rows to capture all distinct identifier values.
+    // Typical script files: 2–10 sources, so a few hundred rows suffices.
+    const totalRows = hc.qSize?.qcy || 0;
+    if (totalRows === 0) return [];
+
+    const colCount = hc.qSize?.qcx || 1;
+    if (colCount < 2) return null;
+
+    try {
+        const height = Math.min(totalRows, PAGE_SIZE);
+        const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
+            { qTop: 0, qLeft: 0, qWidth: colCount, qHeight: height },
+        ]);
+        if (dataPages && dataPages.length > 0) {
+            for (const row of dataPages[0].qMatrix || []) {
+                if (row.length > 1) {
+                    const id = row[1]?.qText;
+                    if (id != null && id !== '') {
+                        idSet.add(id);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        logger.warn('fetchActiveIdentifiers: getHyperCubeData failed:', err);
+    }
+
+    return [...idSet];
 }

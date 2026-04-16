@@ -78,6 +78,17 @@ export function viewerSection() {
                     'Ensures highlighting stays current with your Qlik Sense version. ' +
                     'When off, uses the built-in keyword list bundled with the extension.',
             },
+            multiAppWarningMessage: {
+                ref: 'viewer.multiAppWarningMessage',
+                type: 'string',
+                label: 'Multi-source warning message',
+                defaultValue:
+                    'Multiple scripts detected. Use a filter to select a single script source.',
+                expression: 'optional',
+                description:
+                    'Message shown when more than one distinct value exists in the ' +
+                    'optional second dimension (script source identifier).',
+            },
         },
     };
 }

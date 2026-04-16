@@ -585,6 +585,30 @@ export function renderPlaceholder(element, message = 'Add a dimension containing
 }
 
 /**
+ * Render a warning when multiple script sources are detected.
+ *
+ * Shows an amber-tinted warning with the list of detected sources so the
+ * user knows they need to filter to a single script before viewing.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {string} message - Warning message to display.
+ * @param {string[]} identifiers - List of distinct source identifiers.
+ *
+ * @returns {void}
+ */
+export function renderWarning(element, message, identifiers) {
+    const listItems = (identifiers || []).map((id) => `<li>${escapeHTML(id)}</li>`).join('');
+
+    element.innerHTML = `
+        <div class="${CSS_PREFIX}-warning">
+            <div class="${CSS_PREFIX}-warning-icon">&#9888;</div>
+            <div class="${CSS_PREFIX}-warning-text">${escapeHTML(message)}</div>
+            <ul class="${CSS_PREFIX}-warning-list">${listItems}</ul>
+        </div>
+    `;
+}
+
+/**
  * Escape HTML special characters for safe rendering.
  *
  * @param {string} text - Raw text to escape.

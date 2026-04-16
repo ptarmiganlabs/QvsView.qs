@@ -13,7 +13,7 @@ export default {
     qHyperCubeDef: {
         qDimensions: [],
         qMeasures: [],
-        qInitialDataFetch: [{ qWidth: 1, qHeight: 10000 }],
+        qInitialDataFetch: [{ qWidth: 2, qHeight: 5000 }],
         qSuppressZero: false,
         qSuppressMissing: false,
     },
@@ -23,6 +23,8 @@ export default {
         fontSize: 13,
         enableFolding: true,
         useRuntimeBnf: false,
+        multiAppWarningMessage:
+            'Multiple scripts detected. Use a filter to select a single script source.',
     },
     toolbar: {
         showCopyButton: true,

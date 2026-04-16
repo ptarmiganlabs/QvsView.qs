@@ -203,6 +203,46 @@
     font-size: 14px;
 }
 
+/* ── Multi-app warning ── */
+.qvs-warning {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #7a5c00;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #fff8e1;
+}
+
+.qvs-warning-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    color: #f9a825;
+}
+
+.qvs-warning-text {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    text-align: center;
+    max-width: 420px;
+}
+
+.qvs-warning-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: #9e7c00;
+    text-align: center;
+}
+
+.qvs-warning-list li {
+    padding: 2px 0;
+}
+
 /* ── Search bar ── */
 .qvs-search-bar {
     display: flex;
