@@ -183,6 +183,7 @@ export default function supernova(_galaxy) {
                     enableFolding: viewerOpts.enableFolding !== false,
                     showCopyButton: toolbarOpts.showCopyButton !== false,
                     showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
+                    showSearch: toolbarOpts.showSearch === true,
                 });
             }, [layout, element, rawRows, activeIds, bnfReady]);
         },
@@ -343,9 +344,11 @@ async function fetchAllRows(layout, model) {
     }
 
     // Fetch remaining pages
+    // getHyperCubeData has a 10 000-cell limit per call (qWidth × qHeight).
+    const maxRowsPerPage = Math.floor(PAGE_SIZE / colCount);
     let fetched = result.length;
     while (fetched < totalRows) {
-        const height = Math.min(PAGE_SIZE, totalRows - fetched);
+        const height = Math.min(maxRowsPerPage, totalRows - fetched);
         try {
             const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
                 { qTop: fetched, qLeft: 0, qWidth: colCount, qHeight: height },
@@ -420,7 +423,9 @@ async function fetchActiveIdentifiers(layout, model) {
     if (colCount < 2) return null;
 
     try {
-        const height = Math.min(totalRows, PAGE_SIZE);
+        // getHyperCubeData has a 10 000-cell limit (qWidth × qHeight)
+        const maxRows = Math.floor(PAGE_SIZE / colCount);
+        const height = Math.min(totalRows, maxRows);
         const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
             { qTop: 0, qLeft: 0, qWidth: colCount, qHeight: height },
         ]);

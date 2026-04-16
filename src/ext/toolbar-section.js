@@ -32,6 +32,17 @@ export function toolbarSection() {
                     { value: false, label: 'Off' },
                 ],
             },
+            showSearch: {
+                ref: 'toolbar.showSearch',
+                type: 'boolean',
+                label: 'Search',
+                defaultValue: false,
+                component: 'switch',
+                options: [
+                    { value: true, label: 'On' },
+                    { value: false, label: 'Off' },
+                ],
+            },
         },
     };
 }
