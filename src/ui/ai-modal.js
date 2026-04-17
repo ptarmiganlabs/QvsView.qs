@@ -96,11 +96,12 @@ const LOADING_MESSAGES = [
  *
  * @param {object} opts - Modal options.
  * @param {HTMLElement} opts.container - Parent element to attach the modal to.
- * @param {(opts: {bypassCache: boolean, scope: string}) => Promise<{content: string, model: string, provider: string}>} opts.onAnalyze - Async function that performs the analysis.
+ * @param {(opts: {bypassCache: boolean, scope: string, promptTemplate?: string}) => Promise<{content: string, model: string, provider: string}>} opts.onAnalyze - Async function that performs the analysis.
  * @param {(() => void)} [opts.onClose] - Callback when the modal is closed.
  * @param {number} [opts.quoteCycleSeconds] - Seconds between loading quote changes (3–10).
  * @param {number} opts.sectionCount - Number of script sections/tabs.
  * @param {string} opts.activeSectionName - Name of the currently active section/tab.
+ * @param {string} [opts.promptTemplateMode] - 'properties' (default) or 'runtime'.
  *
  * @returns {{ close: () => void, showLoading: () => void, showError: (msg: string) => void, showResult: (content: string, meta: object) => Promise<void>, promptApiKey: (provider: string) => Promise<string|null>, runAnalysis: (bypassCache?: boolean) => Promise<void> }} Controller object.
  */
@@ -111,6 +112,7 @@ export function showAiModal({
     quoteCycleSeconds = 5,
     sectionCount = 1,
     activeSectionName = 'Main',
+    promptTemplateMode = 'properties',
 }) {
     const cycleMs = Math.max(3, Math.min(10, quoteCycleSeconds)) * 1000;
     // ── Backdrop + Dialog ──
@@ -438,10 +440,60 @@ export function showAiModal({
         });
     }
 
+    // ── Template picker (shown at runtime when promptTemplateMode === 'runtime') ──
+
+    /** @type {string} Last chosen runtime template — remembered across re-analyze clicks */
+    let lastTemplate = '';
+
+    /**
+     * Show an inline prompt template picker.
+     *
+     * @returns {Promise<string|null>} Template key, or null if cancelled.
+     */
+    function promptTemplateChoice() {
+        return new Promise((resolve) => {
+            body.innerHTML = `
+                <div class="${CSS_PREFIX}-ai-scope-prompt">
+                    <p class="${CSS_PREFIX}-ai-scope-title">Choose analysis type</p>
+                    <div class="${CSS_PREFIX}-ai-scope-options ${CSS_PREFIX}-ai-template-grid">
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="general">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">📊</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">General analysis</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Overview, flow, data model & improvements</span>
+                        </button>
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="security">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">🔒</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">Security audit</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Vulnerabilities, risks & remediation</span>
+                        </button>
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="performance">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">⚡</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">Performance review</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Bottlenecks & optimization opportunities</span>
+                        </button>
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="documentation">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">📝</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">Documentation</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Generate comprehensive script docs</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            footer.style.display = 'none';
+
+            body.querySelectorAll(`.${CSS_PREFIX}-ai-scope-btn`).forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    resolve(btn.dataset.template);
+                });
+            });
+        });
+    }
+
     // ── Run analysis ──
     /**
      * Execute the analysis and render results.
      * Prompts for scope if there are multiple script tabs.
+     * Prompts for template if promptTemplateMode is 'runtime'.
      *
      * @param {boolean} [bypassCache] - Whether to bypass the cache.
      */
@@ -455,9 +507,21 @@ export function showAiModal({
         }
         if (!scope) scope = 'full';
 
+        // Determine template — prompt if runtime mode and no previous choice (or re-analyze)
+        let template = lastTemplate;
+        if (promptTemplateMode === 'runtime' && (bypassCache || !template)) {
+            template = await promptTemplateChoice();
+            if (!template) return; // dialog was closed before choosing
+            lastTemplate = template;
+        }
+
         showLoading();
         try {
-            const result = await onAnalyze({ bypassCache, scope });
+            const result = await onAnalyze({
+                bypassCache,
+                scope,
+                promptTemplate: template || undefined,
+            });
             await showResult(result.content, { model: result.model, provider: result.provider });
         } catch (err) {
             showError(err.message || 'Analysis failed');

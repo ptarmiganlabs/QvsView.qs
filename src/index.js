@@ -218,9 +218,14 @@ export default function supernova(_galaxy) {
 function handleAiAnalyze(info, aiOpts) {
     const { sectionScript, fullScript, sectionCount, activeSectionName } = info;
     const provider = aiOpts.provider || 'ollama';
-    const template = aiOpts.promptTemplate || 'general';
     const customPrompt = aiOpts.systemPrompt || '';
-    const systemPrompt = getSystemPrompt(template, customPrompt || undefined);
+    const isRuntimeTemplate = aiOpts.promptTemplateMode === 'runtime';
+    const fixedTemplate = aiOpts.promptTemplate || 'general';
+
+    // Pre-compute system prompt when template is fixed via properties
+    const fixedSystemPrompt = isRuntimeTemplate
+        ? null
+        : getSystemPrompt(fixedTemplate, customPrompt || undefined);
 
     const quoteCycle = aiOpts.quoteCycleSeconds || 5;
 
@@ -229,21 +234,31 @@ function handleAiAnalyze(info, aiOpts) {
         quoteCycleSeconds: quoteCycle,
         sectionCount,
         activeSectionName,
+        promptTemplateMode: isRuntimeTemplate ? 'runtime' : 'properties',
         /**
          * Run the AI analysis, checking cache first.
          *
          * @param {object} opts - Analysis options.
          * @param {boolean} opts.bypassCache - Whether to skip the cache.
          * @param {string} opts.scope - 'section' or 'full'.
+         * @param {string} [opts.promptTemplate] - Template chosen at runtime (if runtime mode).
          *
          * @returns {Promise<{content: string, model: string, provider: string}>} Analysis result.
          */
-        onAnalyze: async ({ bypassCache, scope }) => {
+        onAnalyze: async ({ bypassCache, scope, promptTemplate }) => {
             const scriptText = scope === 'section' ? sectionScript : fullScript;
+
+            // Determine the effective template and system prompt
+            const effectiveTemplate = isRuntimeTemplate
+                ? promptTemplate || 'general'
+                : fixedTemplate;
+            const effectiveOpts = { ...aiOpts, promptTemplate: effectiveTemplate };
+            const systemPrompt =
+                fixedSystemPrompt || getSystemPrompt(effectiveTemplate, customPrompt || undefined);
 
             // Check cache first (unless bypass requested)
             if (!bypassCache) {
-                const cached = getCachedResult(scriptText, aiOpts);
+                const cached = getCachedResult(scriptText, effectiveOpts);
                 if (cached) return cached;
             }
 
@@ -261,14 +276,14 @@ function handleAiAnalyze(info, aiOpts) {
                 }
             }
 
-            const result = await analyzeScript(aiOpts, scriptText, {
+            const result = await analyzeScript(effectiveOpts, scriptText, {
                 systemPrompt,
                 apiKey,
                 bypassCache,
             });
 
             // Cache the result
-            setCachedResult(scriptText, aiOpts, result);
+            setCachedResult(scriptText, effectiveOpts, result);
 
             return result;
         },

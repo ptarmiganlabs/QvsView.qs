@@ -860,6 +860,17 @@
     color: #888;
 }
 
+.qvs-ai-template-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.qvs-ai-template-grid .qvs-ai-scope-btn {
+    min-width: 0;
+    padding: 16px 18px;
+}
+
 /* ── API key prompt ── */
 .qvs-ai-key-prompt {
     display: flex;
