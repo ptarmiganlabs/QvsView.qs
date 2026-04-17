@@ -161,18 +161,27 @@ export function showAiModal({
     let snakeCleanup = null;
 
     // ── Close handler ──
-    /** Remove the modal from the DOM and clean up timers. */
+    /** Remove the modal from the DOM and clean up all listeners and timers. */
     function close() {
+        document.removeEventListener('keydown', handleKeydown);
+        backdrop.removeEventListener('click', handleBackdropClick);
         clearLoadingTimers();
         if (snakeCleanup) snakeCleanup();
         backdrop.remove();
         if (onClose) onClose();
     }
 
-    header.querySelector(`.${CSS_PREFIX}-ai-close`).addEventListener('click', close);
-    backdrop.addEventListener('click', (e) => {
+    /**
+     * Close the modal when clicking outside the dialog.
+     *
+     * @param {MouseEvent} e - Click event.
+     */
+    function handleBackdropClick(e) {
         if (e.target === backdrop) close();
-    });
+    }
+
+    header.querySelector(`.${CSS_PREFIX}-ai-close`).addEventListener('click', close);
+    backdrop.addEventListener('click', handleBackdropClick);
 
     // ── Keyboard: Escape to close, focus trap ──
     /**
@@ -203,21 +212,6 @@ export function showAiModal({
         }
     }
     document.addEventListener('keydown', handleKeydown);
-
-    // Clean up keydown listener on close
-    const origClose = close;
-    /** Close the modal and remove the keydown listener. */
-    const cleanClose = () => {
-        document.removeEventListener('keydown', handleKeydown);
-        origClose();
-    };
-    // Rebind close button and backdrop
-    header.querySelector(`.${CSS_PREFIX}-ai-close`).removeEventListener('click', close);
-    header.querySelector(`.${CSS_PREFIX}-ai-close`).addEventListener('click', cleanClose);
-    backdrop.removeEventListener('click', close);
-    backdrop.addEventListener('click', (e) => {
-        if (e.target === backdrop) cleanClose();
-    });
 
     // ── Loading state ──
     /** Clear all loading interval timers. */
@@ -524,7 +518,7 @@ export function showAiModal({
         dialog.focus();
     }
 
-    return { close: cleanClose, showLoading, showError, showResult, promptApiKey, runAnalysis };
+    return { close, showLoading, showError, showResult, promptApiKey, runAnalysis };
 }
 
 /**
