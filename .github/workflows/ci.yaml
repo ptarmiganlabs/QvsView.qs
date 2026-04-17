@@ -55,6 +55,9 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
+            - name: Install Puppeteer Chrome browser
+              run: npx puppeteer browsers install chrome
+
             - name: Build production zip
               run: npm run pack:prod
 
