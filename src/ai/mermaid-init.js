@@ -5,7 +5,12 @@
  * all `<pre class="mermaid">` elements and render them as SVG diagrams.
  *
  * Loads mermaid from CDN at runtime (keeps the extension bundle small).
+ * Pinned to an exact version to prevent unexpected breaking changes and
+ * supply-chain risk from unpinned version tags.
  */
+
+/** @constant {string} Exact Mermaid version loaded from CDN. */
+const MERMAID_VERSION = '11.14.0';
 
 let mermaidReady = false;
 let mermaidApi = null;
@@ -58,6 +63,9 @@ function sanitizeMermaidSource(src) {
 /**
  * Load mermaid via CDN by injecting a script tag.
  *
+ * The version is pinned to {@link MERMAID_VERSION} to prevent unexpected
+ * breaking changes and supply-chain risk from a floating version tag.
+ *
  * @returns {Promise<object|null>} The mermaid API object, or null if unavailable.
  */
 function loadMermaidFromCdn() {
@@ -69,13 +77,13 @@ function loadMermaidFromCdn() {
         }
 
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+        script.src = `https://cdn.jsdelivr.net/npm/mermaid@${MERMAID_VERSION}/dist/mermaid.min.js`;
         /** Resolve with the global mermaid object once loaded. */
         script.onload = () => {
             resolve(typeof window !== 'undefined' && window.mermaid ? window.mermaid : null);
         };
         /**
-         * Resolve null if CDN load fails.
+         * Resolve null if CDN load fails (e.g. CSP policy or no internet access).
          *
          * @returns {void}
          */
@@ -112,7 +120,18 @@ export async function initMermaidDiagrams(container) {
     if (mermaidEls.length === 0) return;
 
     const mermaidApi = await getMermaid();
-    if (!mermaidApi) return;
+    if (!mermaidApi) {
+        // CDN load failed (e.g. CSP policy or no internet). Show a visible
+        // notice on each diagram element so the user knows diagrams are unavailable.
+        mermaidEls.forEach((el) => {
+            const raw = el.dataset.graph
+                ? decodeURIComponent(el.dataset.graph)
+                : el.textContent || '';
+            el.classList.add('mermaid-unavailable');
+            el.textContent = `[Diagram unavailable — Mermaid (v${MERMAID_VERSION}) could not be loaded from CDN. Raw source:\n${raw}]`;
+        });
+        return;
+    }
 
     if (!mermaidReady) {
         mermaidApi.initialize({

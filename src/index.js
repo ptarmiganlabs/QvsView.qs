@@ -466,10 +466,13 @@ async function fetchAllRows(layout, model) {
  * filter pane, only matching rows appear. This makes it the correct source
  * for determining which script sources are "active".
  *
- * First tries the pre-fetched qDataPages in the layout. If those are empty
- * (which happens when qWidth × qHeight exceeds the 10 000 cell limit, e.g.
- * on existing objects with qHeight: 10000 and qWidth: 2 = 20 000), falls
- * back to an explicit getHyperCubeData call to fetch a small page.
+ * Strategy:
+ * 1. Scan the pre-fetched qDataPages (no engine round-trip). If >1 distinct
+ *    identifier is found, return immediately. If qDataPages already cover all
+ *    rows (rowsSeen >= qSize.qcy), return the set as-is.
+ * 2. Otherwise page through getHyperCubeData in PAGE_SIZE-cell chunks,
+ *    exiting as soon as >1 distinct identifier is confirmed or all rows are
+ *    exhausted.
  *
  * @param {object} layout - Qlik Sense layout object.
  * @param {object} model - Qlik engine model (GenericObject).
@@ -481,8 +484,15 @@ async function fetchActiveIdentifiers(layout, model) {
     const hc = layout?.qHyperCube;
     if (!hc?.qDimensionInfo?.[1]) return null;
 
-    // Try qDataPages first (fast, no engine round-trip)
+    const totalRows = hc.qSize?.qcy || 0;
+    if (totalRows === 0) return [];
+
+    const colCount = hc.qSize?.qcx || 1;
+    if (colCount < 2) return null;
+
+    // ── Step 1: scan pre-fetched qDataPages (no engine round-trip) ──
     const idSet = new Set();
+    let rowsSeen = 0;
     for (const page of hc.qDataPages || []) {
         for (const row of page.qMatrix || []) {
             if (row.length > 1) {
@@ -491,38 +501,45 @@ async function fetchActiveIdentifiers(layout, model) {
                     idSet.add(id);
                 }
             }
+            rowsSeen++;
         }
     }
 
-    if (idSet.size > 0) {
+    // Early exit: multiple sources already confirmed
+    if (idSet.size > 1) {
         return [...idSet];
     }
 
-    // qDataPages empty — fetch a small page from the engine directly.
-    // We only need enough rows to capture all distinct identifier values.
-    // Typical script files: 2–10 sources, so a few hundred rows suffices.
-    const totalRows = hc.qSize?.qcy || 0;
-    if (totalRows === 0) return [];
+    // qDataPages covered every row — no need for extra engine calls
+    if (rowsSeen >= totalRows) {
+        return [...idSet];
+    }
 
-    const colCount = hc.qSize?.qcx || 1;
-    if (colCount < 2) return null;
-
+    // ── Step 2: page through getHyperCubeData until >1 ID or all rows read ──
+    // getHyperCubeData has a PAGE_SIZE-cell limit (qWidth × qHeight).
+    const maxRowsPerPage = Math.floor(PAGE_SIZE / colCount);
+    let top = 0;
     try {
-        // getHyperCubeData has a 10 000-cell limit (qWidth × qHeight)
-        const maxRows = Math.floor(PAGE_SIZE / colCount);
-        const height = Math.min(totalRows, maxRows);
-        const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
-            { qTop: 0, qLeft: 0, qWidth: colCount, qHeight: height },
-        ]);
-        if (dataPages && dataPages.length > 0) {
-            for (const row of dataPages[0].qMatrix || []) {
-                if (row.length > 1) {
-                    const id = row[1]?.qText;
-                    if (id != null && id !== '') {
-                        idSet.add(id);
+        while (top < totalRows) {
+            const height = Math.min(totalRows - top, maxRowsPerPage);
+            const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
+                { qTop: top, qLeft: 0, qWidth: colCount, qHeight: height },
+            ]);
+            for (const page of dataPages || []) {
+                for (const row of page.qMatrix || []) {
+                    if (row.length > 1) {
+                        const id = row[1]?.qText;
+                        if (id != null && id !== '') {
+                            idSet.add(id);
+                        }
                     }
                 }
             }
+            // Early exit: multiple sources confirmed — no need to read more pages
+            if (idSet.size > 1) {
+                return [...idSet];
+            }
+            top += height;
         }
     } catch (err) {
         logger.warn('fetchActiveIdentifiers: getHyperCubeData failed:', err);
