@@ -253,8 +253,9 @@ function handleAiAnalyze(info, aiOpts) {
                 ? promptTemplate || 'general'
                 : fixedTemplate;
             const effectiveOpts = { ...aiOpts, promptTemplate: effectiveTemplate };
-            const systemPrompt =
-                fixedSystemPrompt || getSystemPrompt(effectiveTemplate, customPrompt || undefined);
+            const systemPrompt = isRuntimeTemplate
+                ? getSystemPrompt(effectiveTemplate, customPrompt || undefined)
+                : fixedSystemPrompt;
 
             // Check cache first (unless bypass requested)
             if (!bypassCache) {

@@ -507,7 +507,7 @@ export function showAiModal({
         }
         if (!scope) scope = 'full';
 
-        // Determine template — prompt if runtime mode and no previous choice (or re-analyze)
+        // Determine template — prompt if runtime mode and (re-analyze or no previous choice)
         let template = lastTemplate;
         if (promptTemplateMode === 'runtime' && (bypassCache || !template)) {
             template = await promptTemplateChoice();
