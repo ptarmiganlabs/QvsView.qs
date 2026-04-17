@@ -2,6 +2,7 @@ QvsView.qs — Qlik Load Script Viewer with Syntax Highlighting
 =============================================================
 
 Version: __VERSION__
+Variant: __VARIANT__
 
 Getting Started
 ---------------

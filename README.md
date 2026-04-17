@@ -35,6 +35,8 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 - **Deprecated function detection** — deprecated Qlik functions are rendered with strikethrough styling, sourced from the BNF definition
 - **Runtime BNF** — optionally fetches the authoritative keyword list live from the Qlik Engine API for maximum accuracy
 - **AI script analysis** — send the script to Ollama, OpenAI, or Anthropic for AI-powered review; four prompt templates (General, Security, Performance, Documentation); output rendered as Markdown with Mermaid diagrams; results cached in `sessionStorage` for 30 minutes
+    - **CDN variant**: Mermaid diagrams require internet access (loaded from jsDelivr)
+    - **Air-gapped variant**: Mermaid diagrams work offline (bundled in the extension)
 - **Large script support** — paginated `getHyperCubeData` fetching handles arbitrarily large scripts without truncation
 - **Multi-app detection** — warns when dimension data comes from multiple apps (the viewer is designed to show a single app's script)
 
@@ -51,14 +53,21 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 
 ### Download
 
-1. Go to [**Releases**](https://github.com/ptarmiganlabs/QvsView.qs/releases) and download the latest release ZIP (e.g. `qvsview-qs-v0.2.0.zip`).
+Each release includes two variants of the extension:
+
+| Release file                       | Description                                                                          | When to use                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------- |
+| `qvsview-qs-v{VERSION}-cdn.zip`    | **CDN variant** — Mermaid.js loaded from jsDelivr at runtime. Small bundle (~40 KB). | Environments with internet access             |
+| `qvsview-qs-v{VERSION}-airgap.zip` | **Air-gapped variant** — Mermaid.js bundled in the extension. Larger bundle (~3 MB). | Air-gapped or network-restricted environments |
+
+1. Go to [**Releases**](https://github.com/ptarmiganlabs/QvsView.qs/releases) and download the variant that matches your environment.
 2. Extract the downloaded ZIP. Inside you will find:
-    - `readme.txt` — brief release notes
+    - `readme.txt` — brief release notes (includes the variant name)
     - `LICENSE` — the MIT license
     - `README.pdf` — this documentation as a PDF
     - **`qvsview-qs.zip`** — **this is the actual extension file** that you upload to Qlik Sense
 
-> **Note:** The downloaded file is an outer ZIP that wraps the deployable extension ZIP. Extract the outer ZIP first, then use the inner `qvsview-qs.zip` for installation.
+> **Note:** The downloaded file is an outer ZIP that wraps the deployable extension ZIP. Extract the outer ZIP first, then use the inner `qvsview-qs.zip` for installation. Both variants install identically — only the Mermaid loading strategy differs.
 
 ### Install in Qlik Sense
 
@@ -98,6 +107,8 @@ Platform detection is automatic — the extension identifies the environment and
 ## AI Analysis
 
 QvsView.qs includes an optional AI-powered script analysis feature. Click the **🤖 Analyze** toolbar button to send your script to a large language model for review. Results are rendered as Markdown with Mermaid diagrams and cached in `sessionStorage` for 30 minutes.
+
+> **Mermaid diagrams:** The CDN variant loads Mermaid.js from jsDelivr at runtime — internet access is required for diagram rendering. The air-gapped variant bundles Mermaid.js locally, so diagrams render without any network access. If Mermaid cannot be loaded in either variant, the raw diagram source is displayed as text.
 
 ### Supported Providers
 

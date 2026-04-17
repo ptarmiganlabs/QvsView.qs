@@ -4,13 +4,28 @@
  * After Markdown is rendered into the DOM, call `initMermaidDiagrams()` to find
  * all `<pre class="mermaid">` elements and render them as SVG diagrams.
  *
- * Loads mermaid from CDN at runtime (keeps the extension bundle small).
+ * Two build variants control how Mermaid is loaded:
+ * - `light` (CDN variant) — loads mermaid from jsDelivr at runtime. Keeps the
+ *   extension bundle small (~40 KB) but requires internet access for diagrams.
+ * - `full` (air-gapped variant) — loads mermaid.min.js from the extension folder.
+ *   Larger bundle (~3 MB) but works in air-gapped environments.
+ *
+ * The active variant is set at build time via the `__BUILD_VARIANT__` token.
+ *
  * Pinned to an exact version to prevent unexpected breaking changes and
  * supply-chain risk from unpinned version tags.
  */
 
-/** @constant {string} Exact Mermaid version loaded from CDN. */
+/** @constant {string} Exact Mermaid version used by this build. */
 const MERMAID_VERSION = '11.14.0';
+
+/**
+ * Build variant injected at compile time by Rollup.
+ * `'light'` = CDN, `'full'` = bundled air-gapped.
+ *
+ * @constant {string}
+ */
+const BUILD_VARIANT = __BUILD_VARIANT__;
 
 let mermaidReady = false;
 let mermaidApi = null;
@@ -61,6 +76,60 @@ function sanitizeMermaidSource(src) {
 }
 
 /**
+ * Detect the base URL of this extension inside Qlik Sense.
+ *
+ * Searches the DOM for the extension's own `<script>` tag and derives the
+ * directory path from its `src` attribute, so that the air-gapped variant
+ * can load `mermaid.min.js` from the same folder.
+ *
+ * @returns {string} Base URL ending with `/`, e.g. `/extensions/qvsview-qs/`.
+ */
+function getExtensionBaseUrl() {
+    const scripts = document.querySelectorAll('script[src]');
+    for (const s of scripts) {
+        if (s.src.includes('qvsview-qs')) {
+            // Strip the filename, keep the directory
+            return s.src.replace(/[^/]*$/, '');
+        }
+    }
+    // Fallback for client-managed Qlik Sense default path
+    return '/extensions/qvsview-qs/';
+}
+
+/**
+ * Load mermaid from a local file bundled inside the extension folder.
+ *
+ * Used by the air-gapped build variant so diagrams render without internet.
+ *
+ * @returns {Promise<object|null>} The mermaid API object, or null if unavailable.
+ */
+function loadMermaidFromLocal() {
+    return new Promise((resolve) => {
+        if (typeof window !== 'undefined' && window.mermaid) {
+            resolve(window.mermaid);
+            return;
+        }
+
+        const baseUrl = getExtensionBaseUrl();
+        const script = document.createElement('script');
+        script.src = `${baseUrl}mermaid.min.js`;
+
+        /** Resolve with the global mermaid object once loaded. */
+        script.onload = () => {
+            resolve(typeof window !== 'undefined' && window.mermaid ? window.mermaid : null);
+        };
+
+        /**
+         * Resolve null if local load fails.
+         *
+         * @returns {void}
+         */
+        script.onerror = () => resolve(null);
+        document.head.appendChild(script);
+    });
+}
+
+/**
  * Load mermaid via CDN by injecting a script tag.
  *
  * The version is pinned to {@link MERMAID_VERSION} to prevent unexpected
@@ -93,13 +162,18 @@ function loadMermaidFromCdn() {
 }
 
 /**
- * Get the mermaid API, loading from CDN if needed.
+ * Get the mermaid API, loading it if needed.
+ *
+ * The loading strategy depends on the build variant:
+ * - `'full'` — loads from the extension folder (air-gapped).
+ * - `'light'` (default) — loads from jsDelivr CDN.
  *
  * @returns {Promise<object|null>} The mermaid API, or null if unavailable.
  */
 async function getMermaid() {
     if (mermaidApi) return mermaidApi;
-    mermaidApi = await loadMermaidFromCdn();
+    mermaidApi =
+        BUILD_VARIANT === 'full' ? await loadMermaidFromLocal() : await loadMermaidFromCdn();
     return mermaidApi;
 }
 
@@ -121,14 +195,14 @@ export async function initMermaidDiagrams(container) {
 
     const mermaidApi = await getMermaid();
     if (!mermaidApi) {
-        // CDN load failed (e.g. CSP policy or no internet). Show a visible
-        // notice on each diagram element so the user knows diagrams are unavailable.
+        const source =
+            BUILD_VARIANT === 'full' ? 'the extension folder' : `CDN (v${MERMAID_VERSION})`;
         mermaidEls.forEach((el) => {
             const raw = el.dataset.graph
                 ? decodeURIComponent(el.dataset.graph)
                 : el.textContent || '';
             el.classList.add('mermaid-unavailable');
-            el.textContent = `[Diagram unavailable — Mermaid (v${MERMAID_VERSION}) could not be loaded from CDN. Raw source:\n${raw}]`;
+            el.textContent = `[Diagram unavailable — Mermaid could not be loaded from ${source}. Raw source:\n${raw}]`;
         });
         return;
     }

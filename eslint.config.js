@@ -22,6 +22,7 @@ export default [
                 __BUILD_TYPE__: 'readonly',
                 __PACKAGE_VERSION__: 'readonly',
                 __BUILD_DATE__: 'readonly',
+                __BUILD_VARIANT__: 'readonly',
                 define: 'readonly',
             },
         },
