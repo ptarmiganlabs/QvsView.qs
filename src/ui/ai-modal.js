@@ -46,30 +46,49 @@ const LOADING_MESSAGES = [
     { icon: '🔥', text: 'Main engines firing. Hold on tight.' },
     { icon: '🛸', text: 'Entering orbit around your data model…' },
     { icon: '📡', text: 'Establishing link with the analysis mothership…' },
+    { icon: '🌕', text: 'Achieving stable orbit. Scanning payload…' },
     // Yoda
-    { icon: '🟢', text: 'Patience you must have, young analyst.' },
-    { icon: '🟢', text: 'Strong with the script, this one is.' },
-    { icon: '🟢', text: 'Analyze or analyze not. There is no try.' },
+    { icon: '💚', text: 'Patience you must have, young analyst.' },
+    { icon: '💚', text: 'Strong with the script, this one is.' },
+    { icon: '💚', text: 'Analyze or analyze not. There is no try.' },
+    { icon: '💚', text: 'Much to learn, your data model still has.' },
+    { icon: '💚', text: 'Clouded by JOINs, the future is.' },
     // Pirate
     { icon: '🏴‍☠️', text: "Arrr! Navigatin' through yer data seas…" },
     { icon: '🏴‍☠️', text: "Swabbin' the data deck, cap'n!" },
     { icon: '🦜', text: 'Polly wants a scatter plot!' },
+    { icon: '🏴‍☠️', text: 'X marks the spot where the QVD be buried!' },
+    { icon: '🏴‍☠️', text: 'Hoisting the Jolly LOAD-er!' },
     // Mission control
     { icon: '👨‍🚀', text: 'Houston, we have… a lot of LOAD statements.' },
     { icon: '🛰️', text: 'Deploying satellite analysis array…' },
     { icon: '🌍', text: 'Re-entering the atmosphere of your QVDs…' },
+    { icon: '📟', text: 'Telemetry nominal. Data looks good, Flight.' },
+    { icon: '🧑‍🚀', text: 'Copy that, we have visual on the data model.' },
     // Chef
     { icon: '👨‍🍳', text: 'Marinating the data transformations…' },
     { icon: '🍝', text: 'Your script is al dente. Almost there.' },
-    // Dramatic
+    { icon: '🔪', text: 'Dicing up those resident loads…' },
+    { icon: '🧂', text: 'Adding a pinch of optimization…' },
+    { icon: '🍰', text: 'Baking a layered data model from scratch…' },
+    // Dramatic / Pop culture
     { icon: '🎬', text: 'In a codebase far, far away…' },
     { icon: '⚔️', text: 'The script strikes back!' },
     { icon: '🤖', text: 'Beep boop. Processing human data rituals.' },
     { icon: '🧙', text: 'A wizard is never late. Nor is this analysis.' },
+    { icon: '🦸', text: 'With great data comes great responsibility.' },
+    // Detective / Mystery
     { icon: '🕵️', text: 'Interrogating suspicious WHERE clauses…' },
+    { icon: '🔍', text: 'Following the trail of orphaned keys…' },
+    { icon: '🕵️', text: 'The case of the missing LEFT JOIN…' },
+    { icon: '🔎', text: 'Dusting for fingerprints on the data model…' },
+    { icon: '🕵️', text: 'Elementary, my dear data engineer.' },
+    // Misc fun
     { icon: '🎲', text: 'Rolling for critical analysis…' },
     { icon: '🧪', text: 'Brewing a fresh batch of insights…' },
     { icon: '🐉', text: 'Taming the data dragon…' },
+    { icon: '🎸', text: 'Shredding through your script like a solo…' },
+    { icon: '🏋️', text: 'Heavy-lifting those nested loads…' },
 ];
 
 /**

@@ -1,0 +1,15 @@
+{
+    "name": "qvsview-quote-animations",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Generate animated GIF/MP4 teasers from QvsView.qs loading quotes",
+    "scripts": {
+        "generate": "node generate.mjs",
+        "generate:mp4": "node generate.mjs --format mp4",
+        "generate:all": "node generate.mjs --format all"
+    },
+    "dependencies": {
+        "playwright": "^1.52.0"
+    }
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: radial-gradient(ellipse at 30% 20%, #2a1035 0%, #150a1e 50%, #0a0510 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f0e6f6;
+    position: relative;
+  }
+
+  /* ── Ambient glow ── */
+  body::before {
+    content: '';
+    position: absolute;
+    top: -30%; left: -30%;
+    width: 160%; height: 160%;
+    background: radial-gradient(circle at 25% 35%, rgba(123,45,142,0.15) 0%, transparent 50%),
+                radial-gradient(circle at 75% 65%, rgba(91,26,110,0.10) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Subtle grid pattern ── */
+  body::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(123,45,142,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(123,45,142,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Main content area ── */
+  .slide {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 8% 10%;
+    width: 100%;
+    height: 100%;
+    opacity: var(--opacity, 1);
+    transition: none;
+  }
+
+  /* ── Category badge ── */
+  .category-badge {
+    display: inline-block;
+    padding: 6px 22px;
+    border-radius: 100px;
+    background: linear-gradient(135deg, rgba(123,45,142,0.35) 0%, rgba(91,26,110,0.25) 100%);
+    border: 1px solid rgba(180,120,200,0.25);
+    backdrop-filter: blur(8px);
+    font-size: clamp(11px, 1.8vw, 16px);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(200,170,220,0.9);
+    margin-bottom: 5vh;
+  }
+
+  /* ── Emoji icon ── */
+  .icon {
+    font-size: clamp(48px, 10vw, 120px);
+    line-height: 1.2;
+    margin-bottom: 3vh;
+    filter: drop-shadow(0 4px 20px rgba(123,45,142,0.4));
+  }
+
+  /* ── Quote text ── */
+  .quote {
+    font-size: clamp(18px, 3.5vw, 42px);
+    font-weight: 500;
+    line-height: 1.4;
+    max-width: 80%;
+    color: #ece0f3;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Intro slide (branded opener) ── */
+  .intro-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3vh;
+  }
+  .intro-logo {
+    width: clamp(60px, 12vw, 140px);
+    height: auto;
+    filter: drop-shadow(0 4px 20px rgba(123,45,142,0.4));
+  }
+  .intro-text {
+    font-size: clamp(18px, 3.2vw, 38px);
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.5;
+    color: rgba(220,195,240,0.8);
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Logo slide ── */
+  .logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2vh;
+  }
+  .logo-container img {
+    width: clamp(100px, 22vw, 280px);
+    height: auto;
+    filter: drop-shadow(0 8px 30px rgba(123,45,142,0.5));
+  }
+  .logo-name {
+    font-size: clamp(22px, 4vw, 52px);
+    font-weight: 700;
+    background: linear-gradient(135deg, #e8c8f4 0%, #c89dde 50%, #a66cc4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.02em;
+    margin-top: 1vh;
+  }
+  .tagline {
+    font-size: clamp(12px, 2vw, 24px);
+    font-weight: 400;
+    line-height: 1.5;
+    color: rgba(200,170,220,0.8);
+    letter-spacing: 0.02em;
+    max-width: 80%;
+  }
+  .tagline-coming {
+    font-size: clamp(13px, 2.2vw, 26px);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(200,170,220,0.9);
+    margin-top: 2vh;
+  }
+
+  /* ── Ptarmigan Labs watermark (persistent, all slides) ── */
+  .watermark {
+    position: absolute;
+    bottom: 18px;
+    right: 24px;
+    height: clamp(36px, 7vw, 64px);
+    opacity: 0.65;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  /* ── Attribution line (logo slide only) ── */
+  .attribution {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2.5vh;
+    opacity: 0.8;
+  }
+  .attribution img {
+    height: clamp(40px, 7vw, 70px);
+  }
+  .attribution span {
+    font-size: clamp(16px, 2.8vw, 28px);
+    color: rgba(200,170,220,0.85);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Decorative corner accents ── */
+  .corner {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    z-index: 0;
+    opacity: 0.15;
+  }
+  .corner--tl { top: 20px; left: 20px; border-top: 2px solid #9b5cbf; border-left: 2px solid #9b5cbf; }
+  .corner--tr { top: 20px; right: 20px; border-top: 2px solid #9b5cbf; border-right: 2px solid #9b5cbf; }
+  .corner--bl { bottom: 20px; left: 20px; border-bottom: 2px solid #9b5cbf; border-left: 2px solid #9b5cbf; }
+  .corner--br { bottom: 20px; right: 20px; border-bottom: 2px solid #9b5cbf; border-right: 2px solid #9b5cbf; }
+
+  /* ── Bottom bar accent ── */
+  .bottom-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent 0%, #7b2d8e 30%, #c89dde 50%, #7b2d8e 70%, transparent 100%);
+    opacity: 0.5;
+    z-index: 2;
+  }
+</style>
+</head>
+<body>
+  <!-- Decorative corners -->
+  <div class="corner corner--tl"></div>
+  <div class="corner corner--tr"></div>
+  <div class="corner corner--bl"></div>
+  <div class="corner corner--br"></div>
+  <div class="bottom-bar"></div>
+
+  <!-- Ptarmigan Labs watermark (populated by script) -->
+  <img class="watermark" id="watermark" src="" alt="Ptarmigan Labs">
+
+  <!-- Content injected by script -->
+  <div class="slide" id="slide"></div>
+</body>
+</html>
