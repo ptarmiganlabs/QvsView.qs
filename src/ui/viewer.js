@@ -52,13 +52,14 @@ function buildTabBar(sections, activeIndex) {
 }
 
 /**
- * Build the toolbar HTML (optional search bar + font size dropdown + copy button).
+ * Build the toolbar HTML (optional search bar + font size dropdown + copy button + AI analyze).
  *
  * @param {object} toolbarOpts - Toolbar display options.
  * @param {boolean} toolbarOpts.showCopyButton - Whether to show the copy button.
  * @param {boolean} toolbarOpts.showFontSizeDropdown - Whether to show the font size dropdown.
  * @param {number} toolbarOpts.fontSize - Current font size value.
  * @param {string} [toolbarOpts.searchHTML] - Pre-built search bar HTML to include.
+ * @param {boolean} [toolbarOpts.showAiAnalysis] - Whether to show the AI Analyze button.
  *
  * @returns {string} HTML string for the toolbar.
  */
@@ -68,6 +69,7 @@ function buildToolbar(toolbarOpts) {
         showFontSizeDropdown = false,
         fontSize = 13,
         searchHTML = '',
+        showAiAnalysis = false,
     } = toolbarOpts;
 
     const sizes = [10, 11, 12, 13, 14, 16, 18, 20];
@@ -79,10 +81,15 @@ function buildToolbar(toolbarOpts) {
         ? `<button class="${CSS_PREFIX}-copy-btn" title="Copy to clipboard">&#128203; Copy</button>`
         : '';
 
+    const aiHTML = showAiAnalysis
+        ? `<button class="${CSS_PREFIX}-ai-analyze-btn" title="AI Script Analysis">🤖 Analyze</button>`
+        : '';
+
     return `<div class="${CSS_PREFIX}-toolbar">
         ${searchHTML}
         ${fontSizeHTML}
         ${copyHTML}
+        ${aiHTML}
     </div>`;
 }
 
@@ -113,6 +120,9 @@ export function renderViewer(element, options) {
         showCopyButton = true,
         showFontSizeDropdown = false,
         showSearch = false,
+        showAiAnalysis = false,
+        aiConfig = null,
+        onAiAnalyze = null,
     } = options;
 
     const sections = parseSections(script);
@@ -137,6 +147,9 @@ export function renderViewer(element, options) {
         showCopyButton,
         showFontSizeDropdown,
         showSearch,
+        showAiAnalysis,
+        aiConfig,
+        onAiAnalyze,
     });
 }
 
@@ -169,6 +182,8 @@ function renderSection(element, opts) {
         showCopyButton,
         showFontSizeDropdown,
         showSearch,
+        showAiAnalysis,
+        aiConfig,
     } = opts;
 
     const section = sections[activeIndex];
@@ -297,7 +312,7 @@ function renderSection(element, opts) {
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
                 ${buildTabBar(sections, activeIndex)}
-                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML })}
+                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
               <div class="${CSS_PREFIX}-viewer-inner">
@@ -383,6 +398,22 @@ function renderSection(element, opts) {
                     copyBtn.textContent = 'Failed';
                 }
             );
+        });
+    }
+
+    // AI Analyze button handler
+    const aiBtn = element.querySelector(`.${CSS_PREFIX}-ai-analyze-btn`);
+    if (aiBtn && aiConfig) {
+        aiBtn.addEventListener('click', () => {
+            if (typeof opts.onAiAnalyze === 'function') {
+                opts.onAiAnalyze({
+                    sectionScript,
+                    fullScript,
+                    sectionCount: opts.sections.length,
+                    activeSectionName: section.name,
+                    containerEl: element,
+                });
+            }
         });
     }
 

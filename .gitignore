@@ -3,3 +3,4 @@ dist/
 qvsview-qs-ext/
 *.zip
 bundle-analysis.html
+.DS_Store

@@ -30,4 +30,26 @@ export default {
         showCopyButton: true,
         showFontSizeDropdown: false,
     },
+    ai: {
+        enabled: false,
+        provider: 'ollama',
+        promptTemplate: 'general',
+        systemPrompt: '',
+        ollama: {
+            endpoint: 'http://127.0.0.1:11434',
+            model: 'llama3.1',
+        },
+        openai: {
+            endpoint: 'https://api.openai.com/v1',
+            model: 'gpt-4o',
+            keyMode: 'prompt',
+            apiKey: '',
+        },
+        anthropic: {
+            endpoint: 'https://api.anthropic.com/v1',
+            model: 'claude-sonnet-4-20250514',
+            keyMode: 'prompt',
+            apiKey: '',
+        },
+    },
 };

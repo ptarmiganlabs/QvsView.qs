@@ -44,7 +44,9 @@
         "pack:prod": "cross-env BUILD_TYPE=production npm run build:dist && cross-env BUILD_TYPE=production npm run sense && cross-env BUILD_TYPE=production npm run post-build && npm run zip",
         "prepare": "husky"
     },
-    "dependencies": {},
+    "dependencies": {
+        "dompurify": "^3.4.0"
+    },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@nebula.js/cli": "^6.8.0",

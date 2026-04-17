@@ -25,6 +25,11 @@ import { renderViewer, renderPlaceholder, renderWarning } from './ui/viewer.js';
 import { applyRuntimeBnf, resetToStaticBnf } from './syntax/keywords.js';
 import { fetchRuntimeBnf, clearBnfCache } from './syntax/bnf-loader.js';
 import logger, { PACKAGE_VERSION, BUILD_DATE } from './util/logger.js';
+import { analyzeScript } from './ai/providers.js';
+import { getSystemPrompt } from './ai/system-prompt.js';
+import { getApiKey, cacheApiKey } from './ai/key-manager.js';
+import { getCachedResult, setCachedResult } from './ai/cache.js';
+import { showAiModal } from './ui/ai-modal.js';
 import './style.css';
 
 /** Maximum rows per page request. Qlik limits to 10000. */
@@ -174,6 +179,8 @@ export default function supernova(_galaxy) {
 
                 const viewerOpts = layout.viewer || {};
                 const toolbarOpts = layout.toolbar || {};
+                const aiOpts = layout.ai || {};
+                const aiEnabled = aiOpts.enabled === true;
 
                 renderViewer(element, {
                     script,
@@ -184,10 +191,88 @@ export default function supernova(_galaxy) {
                     showCopyButton: toolbarOpts.showCopyButton !== false,
                     showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
                     showSearch: toolbarOpts.showSearch === true,
+                    showAiAnalysis: aiEnabled,
+                    aiConfig: aiEnabled ? aiOpts : null,
+                    onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
             }, [layout, element, rawRows, activeIds, bnfReady]);
         },
     };
+}
+
+/**
+ * Handle the AI Analyze button click.
+ *
+ * Opens the AI modal, resolves API keys if needed, and runs the analysis.
+ *
+ * @param {object} info - Script info from the viewer.
+ * @param {string} info.sectionScript - Active section script text.
+ * @param {string} info.fullScript - Full concatenated script text.
+ * @param {number} info.sectionCount - Number of script sections/tabs.
+ * @param {string} info.activeSectionName - Name of the active section/tab.
+ * @param {HTMLElement} info.containerEl - The container element.
+ * @param {object} aiOpts - AI configuration from layout.ai.
+ *
+ * @returns {void}
+ */
+function handleAiAnalyze(info, aiOpts) {
+    const { sectionScript, fullScript, sectionCount, activeSectionName } = info;
+    const provider = aiOpts.provider || 'ollama';
+    const template = aiOpts.promptTemplate || 'general';
+    const customPrompt = aiOpts.systemPrompt || '';
+    const systemPrompt = getSystemPrompt(template, customPrompt || undefined);
+
+    const quoteCycle = aiOpts.quoteCycleSeconds || 5;
+
+    const modal = showAiModal({
+        container: document.body,
+        quoteCycleSeconds: quoteCycle,
+        sectionCount,
+        activeSectionName,
+        /**
+         * Run the AI analysis, checking cache first.
+         *
+         * @param {object} opts - Analysis options.
+         * @param {boolean} opts.bypassCache - Whether to skip the cache.
+         * @param {string} opts.scope - 'section' or 'full'.
+         *
+         * @returns {Promise<{content: string, model: string, provider: string}>} Analysis result.
+         */
+        onAnalyze: async ({ bypassCache, scope }) => {
+            const scriptText = scope === 'section' ? sectionScript : fullScript;
+
+            // Check cache first (unless bypass requested)
+            if (!bypassCache) {
+                const cached = getCachedResult(scriptText, aiOpts);
+                if (cached) return cached;
+            }
+
+            // Resolve API key for providers that need one
+            let apiKey = null;
+            if (provider !== 'ollama') {
+                apiKey = getApiKey(provider, aiOpts);
+                if (!apiKey) {
+                    // Ask user for key via modal's inline prompt
+                    apiKey = await modal.promptApiKey(provider);
+                    if (!apiKey) {
+                        throw new Error('API key is required. Analysis cancelled.');
+                    }
+                    cacheApiKey(provider, apiKey);
+                }
+            }
+
+            const result = await analyzeScript(aiOpts, scriptText, {
+                systemPrompt,
+                apiKey,
+                bypassCache,
+            });
+
+            // Cache the result
+            setCachedResult(scriptText, aiOpts, result);
+
+            return result;
+        },
+    });
 }
 
 /**
