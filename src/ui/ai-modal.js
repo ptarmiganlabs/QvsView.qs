@@ -116,12 +116,13 @@ export function showAiModal({
     // ── Backdrop + Dialog ──
     const backdrop = document.createElement('div');
     backdrop.className = `${CSS_PREFIX}-ai-backdrop`;
-    backdrop.setAttribute('role', 'dialog');
-    backdrop.setAttribute('aria-modal', 'true');
-    backdrop.setAttribute('aria-label', 'AI Analysis');
 
     const dialog = document.createElement('div');
     dialog.className = `${CSS_PREFIX}-ai-dialog`;
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-label', 'AI Analysis');
+    dialog.setAttribute('tabindex', '-1');
 
     // ── Header ──
     const header = document.createElement('div');
@@ -515,8 +516,13 @@ export function showAiModal({
     // Start analysis immediately
     runAnalysis();
 
-    // Focus the dialog
-    dialog.focus();
+    // Focus the close button for keyboard accessibility
+    const closeBtn = header.querySelector(`.${CSS_PREFIX}-ai-close`);
+    if (closeBtn) {
+        closeBtn.focus();
+    } else {
+        dialog.focus();
+    }
 
     return { close: cleanClose, showLoading, showError, showResult, promptApiKey, runAnalysis };
 }
