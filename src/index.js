@@ -235,6 +235,7 @@ function handleAiAnalyze(info, aiOpts) {
         sectionCount,
         activeSectionName,
         promptTemplateMode: isRuntimeTemplate ? 'runtime' : 'properties',
+        fixedPromptTemplate: fixedTemplate,
         /**
          * Run the AI analysis, checking cache first.
          *

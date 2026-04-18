@@ -11,6 +11,14 @@ import { initMermaidDiagrams } from '../ai/mermaid-init.js';
 
 const CSS_PREFIX = 'qvs';
 
+/** Human-readable labels and icons for each prompt template key. */
+const TEMPLATE_LABELS = {
+    general: { label: 'General analysis', icon: '📊' },
+    security: { label: 'Security audit', icon: '🔒' },
+    performance: { label: 'Performance review', icon: '⚡' },
+    documentation: { label: 'Documentation', icon: '📝' },
+};
+
 /**
  * Remove trailing conversational filler that LLMs often append
  * (e.g. "Let me know if…", "Feel free to…", "Happy to help…").
@@ -102,6 +110,7 @@ const LOADING_MESSAGES = [
  * @param {number} opts.sectionCount - Number of script sections/tabs.
  * @param {string} opts.activeSectionName - Name of the currently active section/tab.
  * @param {string} [opts.promptTemplateMode] - 'properties' (default) or 'runtime'.
+ * @param {string} [opts.fixedPromptTemplate] - Template key when mode is 'properties'.
  *
  * @returns {{ close: () => void, showLoading: () => void, showError: (msg: string) => void, showResult: (content: string, meta: object) => Promise<void>, promptApiKey: (provider: string) => Promise<string|null>, runAnalysis: (bypassCache?: boolean) => Promise<void> }} Controller object.
  */
@@ -113,6 +122,7 @@ export function showAiModal({
     sectionCount = 1,
     activeSectionName = 'Main',
     promptTemplateMode = 'properties',
+    fixedPromptTemplate = 'general',
 }) {
     const cycleMs = Math.max(3, Math.min(10, quoteCycleSeconds)) * 1000;
     // ── Backdrop + Dialog ──
@@ -237,8 +247,12 @@ export function showAiModal({
         return `${m}m ${s}s`;
     }
 
-    /** Display the loading state with cycling messages, elapsed timer, and Snake game button. */
-    function showLoading() {
+    /**
+     * Display the loading state with cycling messages, elapsed timer, and Snake game button.
+     *
+     * @param {string} [templateKey] - Active prompt template key to display as a badge.
+     */
+    function showLoading(templateKey) {
         clearLoadingTimers();
         if (snakeCleanup) {
             snakeCleanup();
@@ -250,9 +264,16 @@ export function showAiModal({
         let msgIndex = Math.floor(Math.random() * LOADING_MESSAGES.length);
         const first = LOADING_MESSAGES[msgIndex];
 
+        // Template badge HTML
+        const tmpl = templateKey && TEMPLATE_LABELS[templateKey];
+        const badgeHTML = tmpl
+            ? `<p class="${CSS_PREFIX}-ai-template-badge">${tmpl.icon} ${escapeHtml(tmpl.label)}</p>`
+            : '';
+
         body.innerHTML = `
             <div class="${CSS_PREFIX}-ai-loading">
                 <div class="${CSS_PREFIX}-ai-spinner"></div>
+                ${badgeHTML}
                 <p class="${CSS_PREFIX}-ai-loading-msg">${first.icon} ${first.text}</p>
                 <p class="${CSS_PREFIX}-ai-loading-elapsed">0s</p>
                 <button class="${CSS_PREFIX}-ai-btn ${CSS_PREFIX}-ai-snake-btn">🐍 Play Snake while you wait?</button>
@@ -327,7 +348,7 @@ export function showAiModal({
      * Render the analysis result in the modal body.
      *
      * @param {string} content - Markdown content from the AI provider.
-     * @param {{ model: string, provider: string }} meta - Provider metadata.
+     * @param {{ model: string, provider: string, templateKey?: string }} meta - Provider metadata.
      */
     async function showResult(content, meta) {
         clearLoadingTimers();
@@ -343,6 +364,10 @@ export function showAiModal({
         const html = renderMarkdown(rawContent);
         const metaParts = [];
         if (meta) {
+            const tmpl = meta.templateKey && TEMPLATE_LABELS[meta.templateKey];
+            if (tmpl) {
+                metaParts.push(`${tmpl.icon} ${escapeHtml(tmpl.label)}`);
+            }
             metaParts.push(`Model: ${escapeHtml(meta.model)}`);
             metaParts.push(`Provider: ${escapeHtml(meta.provider)}`);
         }
@@ -515,14 +540,21 @@ export function showAiModal({
             lastTemplate = template;
         }
 
-        showLoading();
+        // Effective template key for display (runtime pick or fixed from properties)
+        const effectiveTemplate = template || fixedPromptTemplate;
+
+        showLoading(effectiveTemplate);
         try {
             const result = await onAnalyze({
                 bypassCache,
                 scope,
                 promptTemplate: template || undefined,
             });
-            await showResult(result.content, { model: result.model, provider: result.provider });
+            await showResult(result.content, {
+                model: result.model,
+                provider: result.provider,
+                templateKey: effectiveTemplate,
+            });
         } catch (err) {
             showError(err.message || 'Analysis failed');
         }

@@ -597,6 +597,19 @@
     }
 }
 
+/* Template badge shown during loading and in result meta */
+.qvs-ai-template-badge {
+    display: inline-block;
+    margin: 0 0 10px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4a90d9;
+    background: #eef4fd;
+    border: 1px solid #c5d9f0;
+    border-radius: 12px;
+}
+
 /* Loading message that cycles */
 .qvs-ai-loading-msg {
     font-size: 16px;
