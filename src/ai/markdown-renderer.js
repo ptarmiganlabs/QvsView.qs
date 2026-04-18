@@ -270,7 +270,7 @@ function inlineFormat(text) {
 }
 
 /**
- * Check if a line looks like a Markdown table row (contains at least one pipe).
+ * Check if a line looks like a Markdown table row (pipe-delimited with at least two cells).
  *
  * @param {string} line - Raw line text.
  *
@@ -278,7 +278,9 @@ function inlineFormat(text) {
  */
 function isTableRow(line) {
     const trimmed = line.trim();
-    return trimmed.includes('|');
+    // Require at least two pipes to distinguish from casual pipe usage in text
+    const pipeCount = (trimmed.match(/\|/g) || []).length;
+    return pipeCount >= 2;
 }
 
 /**
@@ -295,6 +297,7 @@ function isTableSeparator(line) {
 
 /**
  * Parse a pipe-delimited table row into an HTML `<tr>`.
+ * Supports escaped pipes (`\|`) inside cell content.
  *
  * @param {string} line - Raw table row text.
  * @param {string} cellTag - 'th' for header cells, 'td' for body cells.
@@ -303,7 +306,8 @@ function isTableSeparator(line) {
  */
 function buildTableRow(line, cellTag) {
     const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
-    const cells = trimmed.split('|').map((c) => c.trim());
+    // Split on unescaped pipes, then restore escaped ones
+    const cells = trimmed.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
     const cellsHtml = cells.map((c) => `<${cellTag}>${inlineFormat(c)}</${cellTag}>`).join('');
     return `<tr>${cellsHtml}</tr>`;
 }
