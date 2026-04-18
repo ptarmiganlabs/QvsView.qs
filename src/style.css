@@ -795,6 +795,36 @@
     text-decoration: underline;
 }
 
+/* Tables */
+.qvs-ai-result table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.qvs-ai-result th,
+.qvs-ai-result td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.qvs-ai-result th {
+    background: #f5f7fa;
+    font-weight: 600;
+    color: #333;
+}
+
+.qvs-ai-result tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+.qvs-ai-result tbody tr:hover {
+    background: #f0f4f8;
+}
+
 .qvs-ai-disclaimer {
     margin-top: 16px;
     padding: 8px 12px;
