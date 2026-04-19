@@ -6,3 +6,7 @@ bundle-analysis.html
 .DS_Store
 output/
 tmp-frames/
+
+// Ignore scripts used for testing and development
+extract_scripts_cm_plabs.sh
+extract_scripts_cm_plabs.ps1

@@ -116,7 +116,12 @@ export default function supernova(_galaxy) {
                     return fetchAllRows(layout, model);
                 };
 
-                load().then(setRawRows);
+                load()
+                    .then(setRawRows)
+                    .catch((err) => {
+                        logger.warn('Data fetch failed:', err);
+                        setRawRows(null);
+                    });
 
                 // Also fetch active identifiers from the hypercube
                 if (layout.qHyperCube?.qDimensionInfo?.[1]) {
@@ -303,6 +308,11 @@ function handleAiAnalyze(info, aiOpts) {
  * hypercube (via getActiveIdentifiers) to determine which identifiers are
  * currently in scope and filter the rows accordingly.
  *
+ * Important: GetTablesAndKeys reports fields in an order (key fields first)
+ * that does NOT match the column order returned by GetTableData (load order).
+ * Column mapping is resolved by probing sample values from the hypercube
+ * against GetTableData columns.
+ *
  * @param {object} app - Qlik Doc API (from useApp hook).
  * @param {object} layout - Qlik Sense layout object.
  *
@@ -339,20 +349,18 @@ async function fetchViaTableData(app, layout) {
             { qcx: 0, qcy: 0 },
             { qcx: 0, qcy: 0 },
             0,
-            true,
+            false,
             false
         );
 
         // Find the table that contains our script field
         let tableName = null;
-        let fieldIndex = 0;
         let totalRows = 0;
 
         for (const table of tables || []) {
-            const idx = (table.qFields || []).findIndex((f) => f.qName === fieldName);
-            if (idx >= 0) {
+            const found = (table.qFields || []).some((f) => f.qName === fieldName);
+            if (found) {
                 tableName = table.qName;
-                fieldIndex = idx;
                 totalRows = table.qNoOfRows;
                 break;
             }
@@ -363,39 +371,125 @@ async function fetchViaTableData(app, layout) {
             return null;
         }
 
-        // Find the identifier field index in the same table (if configured)
-        let idFieldIndex = -1;
+        // Verify the identifier field is in the same table (if configured)
         if (idFieldName) {
-            for (const table of tables || []) {
-                if (table.qName === tableName) {
-                    idFieldIndex = (table.qFields || []).findIndex((f) => f.qName === idFieldName);
-                    break;
-                }
-            }
-            if (idFieldIndex < 0) {
+            const targetTable = (tables || []).find((t) => t.qName === tableName);
+            const idInTable = (targetTable?.qFields || []).some((f) => f.qName === idFieldName);
+            if (!idInTable) {
                 logger.debug(
                     `GetTableData: identifier field "${idFieldName}" not in table "${tableName}"`
                 );
+                idFieldName = null;
             }
         }
 
         // Fetch all rows — GetTableData preserves duplicates and order
-        const rows = await app.getTableData(0, totalRows, true, tableName);
+        const rows = await app.getTableData(0, totalRows, false, tableName);
+        if (!rows || rows.length === 0) return null;
 
-        const result = (rows || []).map((row) => {
+        const colCount = rows[0]?.qValue?.length || 0;
+        if (colCount === 0) return null;
+
+        // Resolve actual column indices by probing values against the hypercube.
+        // GetTablesAndKeys field order does NOT match GetTableData column order
+        // (the former sorts key fields first; the latter uses load order).
+        const fieldIndex = resolveColumnIndex(hc, 0, rows, colCount);
+        let idFieldIndex = -1;
+        if (idFieldName && hc.qDimensionInfo?.[1]) {
+            idFieldIndex = resolveColumnIndex(hc, 1, rows, colCount);
+        }
+
+        // Guard: text and id columns must not collide
+        if (idFieldIndex >= 0 && idFieldIndex === fieldIndex) {
+            logger.warn('GetTableData: column collision — text and id resolved to same column');
+            idFieldIndex = -1;
+        }
+
+        const result = rows.map((row) => {
             const values = row.qValue || [];
             return {
-                text: values[fieldIndex]?.qText ?? '',
-                id: idFieldIndex >= 0 ? (values[idFieldIndex]?.qText ?? null) : null,
+                text: fieldIndex < values.length ? (values[fieldIndex]?.qText ?? '') : '',
+                id:
+                    idFieldIndex >= 0 && idFieldIndex < values.length
+                        ? (values[idFieldIndex]?.qText ?? null)
+                        : null,
             };
         });
 
-        logger.info(`GetTableData: ${result.length} rows from "${tableName}.${fieldName}"`);
+        logger.info(
+            `GetTableData: ${result.length} rows from "${tableName}.${fieldName}" (col ${fieldIndex})`
+        );
         return result.length > 0 ? result : null;
     } catch (err) {
         logger.warn('GetTableData failed:', err);
         return null;
     }
+}
+
+/**
+ * Determine the correct GetTableData column index for a hypercube dimension.
+ *
+ * GetTablesAndKeys reports fields in an order that does not match
+ * GetTableData column order. This function probes sample values from the
+ * hypercube's pre-fetched qDataPages and matches them against GetTableData
+ * columns to find the correct mapping.
+ *
+ * @param {object} hc - The qHyperCube from the layout.
+ * @param {number} dimIndex - Dimension index in the hypercube (0-based).
+ * @param {Array} sampleRows - A few rows from GetTableData.
+ * @param {number} colCount - Number of columns in GetTableData rows.
+ *
+ * @returns {number} The resolved column index in GetTableData.
+ */
+function resolveColumnIndex(hc, dimIndex, sampleRows, colCount) {
+    // Collect known values for this dimension from the hypercube's pre-fetched pages
+    const knownValues = new Set();
+    for (const page of hc.qDataPages || []) {
+        for (const row of page.qMatrix || []) {
+            if (row.length > dimIndex) {
+                const val = row[dimIndex]?.qText;
+                if (val != null && val !== '' && val !== '-') {
+                    knownValues.add(val);
+                }
+            }
+            if (knownValues.size >= 50) break;
+        }
+        if (knownValues.size >= 50) break;
+    }
+
+    if (knownValues.size === 0) return dimIndex;
+
+    // Score each GetTableData column by counting matches against known values.
+    // Check up to 20 sample rows to reduce false positives.
+    const maxProbe = Math.min(sampleRows.length, 20);
+    const scores = new Array(colCount).fill(0);
+
+    for (let r = 0; r < maxProbe; r++) {
+        const values = sampleRows[r]?.qValue || [];
+        for (let c = 0; c < colCount; c++) {
+            if (knownValues.has(values[c]?.qText)) {
+                scores[c]++;
+            }
+        }
+    }
+
+    // The column with the highest score is the best match
+    let bestCol = dimIndex < colCount ? dimIndex : 0;
+    let bestScore = -1;
+    for (let c = 0; c < colCount; c++) {
+        if (scores[c] > bestScore) {
+            bestScore = scores[c];
+            bestCol = c;
+        }
+    }
+
+    if (bestScore === 0) {
+        // No matches found — fall back to the dimension index as-is
+        logger.debug(`resolveColumnIndex: no matches for dim ${dimIndex}, using fallback`);
+        return dimIndex < colCount ? dimIndex : 0;
+    }
+
+    return bestCol;
 }
 
 /**
