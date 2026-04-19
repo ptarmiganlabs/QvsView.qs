@@ -14,6 +14,9 @@ import { detectFoldRanges, buildFoldMap } from '../syntax/fold-detector.js';
 
 const CSS_PREFIX = 'qvs';
 
+/** Delay (ms) before closing the dropdown on blur — allows click events on options to fire. */
+const DROPDOWN_BLUR_DELAY_MS = 150;
+
 /** @type {boolean} */
 let cssInjected = false;
 
@@ -814,7 +817,7 @@ function attachAppSelectorListeners(element, opts) {
             if (!wrapper.contains(document.activeElement)) {
                 dropdown.style.display = 'none';
             }
-        }, 150);
+        }, DROPDOWN_BLUR_DELAY_MS);
     });
 
     // Also close on mousedown outside (handles clicks on non-focusable areas)
