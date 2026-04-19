@@ -214,9 +214,25 @@ function getOpenAIModels(endpoint, apiKey) {
                 Authorization: `Bearer ${apiKey}`,
             },
         })
-            .then((r) => r.json())
+            .then((r) =>
+                r.text().then((body) => {
+                    if (!r.ok) {
+                        throw new Error(
+                            `OpenAI models request failed with status ${r.status}${
+                                body ? `: ${body}` : ''
+                            }`
+                        );
+                    }
+
+                    return body ? JSON.parse(body) : {};
+                })
+            )
             .then((data) => {
-                openaiModels = (data.data || [])
+                if (!Array.isArray(data.data)) {
+                    throw new Error('OpenAI models response did not contain a valid data array');
+                }
+
+                openaiModels = data.data
                     .sort((a, b) => a.id.localeCompare(b.id))
                     .map((m) => ({ value: m.id, label: m.id }));
                 openaiFetchDone = true;
