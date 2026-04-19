@@ -13,7 +13,7 @@ export default {
     qHyperCubeDef: {
         qDimensions: [],
         qMeasures: [],
-        qInitialDataFetch: [{ qWidth: 2, qHeight: 5000 }],
+        qInitialDataFetch: [{ qWidth: 3, qHeight: 5000 }],
         qSuppressZero: false,
         qSuppressMissing: false,
     },
@@ -29,6 +29,7 @@ export default {
     toolbar: {
         showCopyButton: true,
         showFontSizeDropdown: false,
+        showAppSelector: false,
     },
     ai: {
         enabled: false,

@@ -31,6 +31,7 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 - **Section tabs** — automatically detects script sections and renders a clickable tab strip for instant navigation between script sections
 - **Search** (Ctrl/Cmd+F) — real-time search with highlighted matches; automatically expands any folded regions that contain a match
 - **Code folding** — collapse and expand sections to focus on specific parts of the script; fold state is preserved while navigating
+- **Script file selection** — optional searchable dropdown in the viewer toolbar that lists all available values from a dedicated dimension, allowing users to select which script to view directly from the extension widget (selection is applied to the app's data model)
 - **Copy to clipboard** — one-click copy of the visible section or the full concatenated script
 - **Deprecated function detection** — deprecated Qlik functions are rendered with strikethrough styling, sourced from the BNF definition
 - **Runtime BNF** — optionally fetches the authoritative keyword list live from the Qlik Engine API for maximum accuracy
@@ -50,6 +51,7 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 - Two fields in your data model:
     - One field containing the load scripts' rows (typically loaded from `.qvs` files)
     - One field containing a script identifier, such as the script file name, app name or app ID. Has to be unique across all scripts loaded into the app.
+- (Optional) A third field for **script file selection** — used by the in-widget searchable dropdown to let users pick which script to view. This can be the same field as the script identifier or a different one containing app names, file names, etc.
 
 ### Download
 
@@ -87,9 +89,10 @@ Each release includes two variants of the extension:
 
 1. With the extension on a sheet in edit mode, open the **property panel** and add a **Dimension** — select the field that contains your script rows.
 2. Add a second **Dimension** — select the field that contains the script identifier (e.g. file name, app name, or app ID).
-3. Optionally adjust viewer settings: font size, line numbers, and other display options.
-4. Switch to analysis mode. The script renders with full syntax highlighting.
-5. Use the **section tabs** to jump between tabs, press **Ctrl/Cmd+F** to open the search bar, and click the fold indicators in the gutter to collapse sections.
+3. (Optional) Add a third **Dimension** — select the field for **script file selection** (e.g. app name or file name). Then enable _Viewer Toolbar → Script file selection_ in the property panel to show a searchable dropdown in the toolbar.
+4. Optionally adjust viewer settings: font size, line numbers, and other display options.
+5. Switch to analysis mode. The script renders with full syntax highlighting.
+6. Use the **section tabs** to jump between tabs, press **Ctrl/Cmd+F** to open the search bar, and click the fold indicators in the gutter to collapse sections.
 
 ---
 
@@ -147,6 +150,28 @@ While waiting for the AI response, the modal shows:
 - **Cycling humorous quotes** with smooth fade transitions (cycle time is configurable, 3–10 s)
 - **Elapsed timer** tracking how long the analysis has been running
 - **Snake mini-game** — a retro canvas-based game (WASD or arrow keys) to pass the time
+
+---
+
+## Script File Selection
+
+QvsView.qs includes an optional script file selection feature that adds a searchable dropdown to the viewer toolbar. This allows users to select which script to view directly from the extension widget, without needing a separate filter pane.
+
+### Setup
+
+1. Add a third **Dimension** in the property panel — select the field containing the script file names, app names, or other identifiers you want users to choose from.
+2. Enable **Script file selection** in the property panel under _Viewer Toolbar → Script file selection_.
+3. A searchable dropdown appears in the viewer toolbar, to the left of the search bar.
+
+### How It Works
+
+- The dropdown lists all distinct values from the third dimension.
+- Type in the dropdown to filter the list in real time (case-insensitive).
+- Click a value (or press Enter) to select it — the selection is applied to the app's data model, filtering the displayed script.
+- Click the ✕ button to clear the selection and show all scripts again.
+- Zero or one selection is supported at a time.
+
+> **Note:** The third dimension is optional. When script file selection is disabled in the property panel, the third dimension is not required and is ignored if present.
 
 ---
 

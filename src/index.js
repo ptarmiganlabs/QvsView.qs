@@ -70,6 +70,8 @@ export default function supernova(_galaxy) {
             const [rawRows, setRawRows] = useState(null);
             const [activeIds, setActiveIds] = useState(null);
             const [bnfReady, setBnfReady] = useState(false);
+            /** Distinct values from the 3rd dimension (script file selection). */
+            const [selectorValues, setSelectorValues] = useState(null);
 
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
@@ -129,6 +131,13 @@ export default function supernova(_galaxy) {
                 } else {
                     setActiveIds(null);
                 }
+
+                // Fetch distinct values from the 3rd dimension (script file selection)
+                if (layout.qHyperCube?.qDimensionInfo?.[2]) {
+                    fetchSelectorValues(layout, model).then(setSelectorValues);
+                } else {
+                    setSelectorValues(null);
+                }
             }, [layout, model, app]);
 
             // Add "Copy selected text" to the right-click context menu
@@ -187,6 +196,15 @@ export default function supernova(_galaxy) {
                 const aiOpts = layout.ai || {};
                 const aiEnabled = aiOpts.enabled === true;
 
+                // App selector: show when enabled AND 3rd dimension is configured
+                const showAppSelector =
+                    toolbarOpts.showAppSelector === true &&
+                    selectorValues != null &&
+                    selectorValues.length > 0;
+
+                // Determine the currently selected value from the 3rd dimension
+                const selectedApp = showAppSelector ? getSelectedSelectorValue(layout) : null;
+
                 renderViewer(element, {
                     script,
                     showLineNumbers: viewerOpts.showLineNumbers !== false,
@@ -196,11 +214,17 @@ export default function supernova(_galaxy) {
                     showCopyButton: toolbarOpts.showCopyButton !== false,
                     showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
                     showSearch: toolbarOpts.showSearch === true,
+                    showAppSelector,
+                    selectorValues: showAppSelector ? selectorValues : [],
+                    selectedApp,
+                    onAppSelect: showAppSelector
+                        ? (value) => handleAppSelect(app, layout, value)
+                        : null,
                     showAiAnalysis: aiEnabled,
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
-            }, [layout, element, rawRows, activeIds, bnfReady]);
+            }, [layout, element, rawRows, activeIds, selectorValues, bnfReady]);
         },
     };
 }
@@ -657,4 +681,142 @@ async function fetchActiveIdentifiers(layout, model) {
     }
 
     return [...idSet];
+}
+
+/**
+ * Fetch distinct values from the 3rd hypercube dimension (script file selection).
+ *
+ * Scans the pre-fetched qDataPages and, if necessary, pages through
+ * additional data to collect all unique values.
+ *
+ * @param {object} layout - Qlik Sense layout object.
+ * @param {object} model - Qlik engine model (GenericObject).
+ *
+ * @returns {Promise<string[]|null>} Sorted array of distinct values, or null
+ *   when no third dimension is configured.
+ */
+async function fetchSelectorValues(layout, model) {
+    const hc = layout?.qHyperCube;
+    if (!hc?.qDimensionInfo?.[2]) return null;
+
+    const totalRows = hc.qSize?.qcy || 0;
+    if (totalRows === 0) return [];
+
+    const colCount = hc.qSize?.qcx || 1;
+    if (colCount < 3) return null;
+
+    const valSet = new Set();
+    let rowsSeen = 0;
+
+    // Step 1: scan pre-fetched qDataPages
+    for (const page of hc.qDataPages || []) {
+        for (const row of page.qMatrix || []) {
+            if (row.length > 2) {
+                const val = row[2]?.qText;
+                if (val != null && val !== '' && val !== '-') {
+                    valSet.add(val);
+                }
+            }
+            rowsSeen++;
+        }
+    }
+
+    // If qDataPages covered every row, return
+    if (rowsSeen >= totalRows) {
+        return [...valSet].sort((a, b) => a.localeCompare(b));
+    }
+
+    // Step 2: page through remaining rows
+    const maxRowsPerPage = Math.floor(PAGE_SIZE / colCount);
+    let top = rowsSeen;
+    try {
+        while (top < totalRows) {
+            const height = Math.min(totalRows - top, maxRowsPerPage);
+            const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
+                { qTop: top, qLeft: 0, qWidth: colCount, qHeight: height },
+            ]);
+            for (const page of dataPages || []) {
+                for (const row of page.qMatrix || []) {
+                    if (row.length > 2) {
+                        const val = row[2]?.qText;
+                        if (val != null && val !== '' && val !== '-') {
+                            valSet.add(val);
+                        }
+                    }
+                }
+            }
+            top += height;
+        }
+    } catch (err) {
+        logger.warn('fetchSelectorValues: getHyperCubeData failed:', err);
+    }
+
+    return [...valSet].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Get the currently selected value from the 3rd hypercube dimension.
+ *
+ * When exactly one value has selection state `S` (selected) in the dimension
+ * info, that value is considered the active selection.
+ *
+ * @param {object} layout - Qlik Sense layout object.
+ *
+ * @returns {string|null} The selected value, or null if none/multiple.
+ */
+function getSelectedSelectorValue(layout) {
+    const dimInfo = layout?.qHyperCube?.qDimensionInfo?.[2];
+    if (!dimInfo) return null;
+
+    // qStateCounts: { qSelected, qOption, ... }
+    // When exactly one value is selected, qStateCounts.qSelected === 1
+    if (dimInfo.qStateCounts?.qSelected === 1) {
+        // The selection value can be retrieved from qDimensionInfo's selected items
+        // In Qlik, when one item is selected, qFallbackTitle shows the selected value
+        // when qStateCounts.qSelected === 1
+        return dimInfo.qFallbackTitle || null;
+    }
+
+    return null;
+}
+
+/**
+ * Handle an app selection from the script file selector dropdown.
+ *
+ * When a value is selected, a field selection is applied in the data model.
+ * When the selection is cleared (null), the field selection is removed.
+ *
+ * @param {object} app - Qlik Doc API (from useApp hook).
+ * @param {object} layout - Qlik Sense layout object.
+ * @param {string|null} value - The selected value, or null to clear.
+ *
+ * @returns {Promise<void>}
+ */
+async function handleAppSelect(app, layout, value) {
+    if (!app) return;
+
+    const dimInfo = layout?.qHyperCube?.qDimensionInfo?.[2];
+    if (!dimInfo) return;
+
+    // Extract the field name from the 3rd dimension
+    let fieldName = dimInfo.qGroupFieldDefs?.[0] || dimInfo.qFallbackTitle;
+    if (!fieldName) return;
+
+    // Strip expression prefix and brackets: "=[FieldName]" -> "FieldName"
+    fieldName = fieldName.replace(/^=/, '').replace(/^\[|\]$/g, '');
+
+    try {
+        const field = await app.getField(fieldName);
+        if (!field) return;
+
+        if (value == null) {
+            await field.clear();
+            logger.info(`App selector: cleared selection on "${fieldName}"`);
+        } else {
+            await field.selectValues([{ qText: value, qIsNumeric: false }], false, false);
+            logger.info(`App selector: selected "${value}" in "${fieldName}"`);
+        }
+    } catch (err) {
+        logger.warn('App selector: selection failed:', err);
+    }
 }

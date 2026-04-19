@@ -52,7 +52,7 @@ function buildTabBar(sections, activeIndex) {
 }
 
 /**
- * Build the toolbar HTML (optional search bar + font size dropdown + copy button + AI analyze).
+ * Build the toolbar HTML (optional app selector + search bar + font size dropdown + copy button + AI analyze).
  *
  * @param {object} toolbarOpts - Toolbar display options.
  * @param {boolean} toolbarOpts.showCopyButton - Whether to show the copy button.
@@ -60,6 +60,9 @@ function buildTabBar(sections, activeIndex) {
  * @param {number} toolbarOpts.fontSize - Current font size value.
  * @param {string} [toolbarOpts.searchHTML] - Pre-built search bar HTML to include.
  * @param {boolean} [toolbarOpts.showAiAnalysis] - Whether to show the AI Analyze button.
+ * @param {boolean} [toolbarOpts.showAppSelector] - Whether to show the app selector dropdown.
+ * @param {string[]} [toolbarOpts.selectorValues] - Available values for the app selector.
+ * @param {string|null} [toolbarOpts.selectedApp] - Currently selected value.
  *
  * @returns {string} HTML string for the toolbar.
  */
@@ -70,6 +73,9 @@ function buildToolbar(toolbarOpts) {
         fontSize = 13,
         searchHTML = '',
         showAiAnalysis = false,
+        showAppSelector = false,
+        selectorValues = [],
+        selectedApp = null,
     } = toolbarOpts;
 
     const sizes = [10, 11, 12, 13, 14, 16, 18, 20];
@@ -85,12 +91,69 @@ function buildToolbar(toolbarOpts) {
         ? `<button class="${CSS_PREFIX}-ai-analyze-btn" title="AI Script Analysis">🤖 Analyze</button>`
         : '';
 
+    const appSelectorHTML = showAppSelector
+        ? buildAppSelectorHTML(selectorValues, selectedApp)
+        : '';
+
     return `<div class="${CSS_PREFIX}-toolbar">
+        ${appSelectorHTML}
         ${searchHTML}
         ${fontSizeHTML}
         ${copyHTML}
         ${aiHTML}
     </div>`;
+}
+
+/**
+ * Build HTML for the script file selection dropdown.
+ *
+ * Renders a searchable dropdown with a text input that filters the list
+ * in real time. The dropdown is positioned absolutely below the input.
+ *
+ * @param {string[]} values - Available values to choose from.
+ * @param {string|null} selectedValue - Currently selected value, or null.
+ *
+ * @returns {string} HTML string for the app selector widget.
+ */
+function buildAppSelectorHTML(values, selectedValue) {
+    const displayText = selectedValue || '';
+    const placeholder = selectedValue ? '' : 'Select script file\u2026';
+    const clearBtnStyle = selectedValue ? '' : ' style="display:none"';
+
+    const optionItems = values
+        .map(
+            (v) =>
+                `<div class="${CSS_PREFIX}-appselector-option${v === selectedValue ? ` ${CSS_PREFIX}-appselector-option-selected` : ''}" data-value="${escapeHTML(v)}">${escapeHTML(v)}</div>`
+        )
+        .join('');
+
+    return `<div class="${CSS_PREFIX}-appselector">
+        <div class="${CSS_PREFIX}-appselector-input-wrap">
+            <input class="${CSS_PREFIX}-appselector-input" type="text"
+                   placeholder="${placeholder}" value="${escapeAttr(displayText)}"
+                   spellcheck="false" autocomplete="off"
+                   title="Script file selection" />
+            <button class="${CSS_PREFIX}-appselector-clear" title="Clear selection"${clearBtnStyle}>&#10005;</button>
+        </div>
+        <div class="${CSS_PREFIX}-appselector-dropdown" style="display:none">
+            ${optionItems}
+        </div>
+    </div>`;
+}
+
+/**
+ * Escape an HTML attribute value for safe embedding.
+ *
+ * @param {string} text - Raw text to escape.
+ *
+ * @returns {string} Escaped text safe for HTML attributes.
+ */
+function escapeAttr(text) {
+    return (text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 /**
@@ -120,6 +183,10 @@ export function renderViewer(element, options) {
         showCopyButton = true,
         showFontSizeDropdown = false,
         showSearch = false,
+        showAppSelector = false,
+        selectorValues = [],
+        selectedApp = null,
+        onAppSelect = null,
         showAiAnalysis = false,
         aiConfig = null,
         onAiAnalyze = null,
@@ -147,6 +214,10 @@ export function renderViewer(element, options) {
         showCopyButton,
         showFontSizeDropdown,
         showSearch,
+        showAppSelector,
+        selectorValues,
+        selectedApp,
+        onAppSelect,
         showAiAnalysis,
         aiConfig,
         onAiAnalyze,
@@ -182,6 +253,9 @@ function renderSection(element, opts) {
         showCopyButton,
         showFontSizeDropdown,
         showSearch,
+        showAppSelector,
+        selectorValues,
+        selectedApp,
         showAiAnalysis,
         aiConfig,
     } = opts;
@@ -312,7 +386,7 @@ function renderSection(element, opts) {
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
                 ${buildTabBar(sections, activeIndex)}
-                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
+                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis, showAppSelector, selectorValues, selectedApp })}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
               <div class="${CSS_PREFIX}-viewer-inner">
@@ -427,6 +501,9 @@ function renderSection(element, opts) {
             }
         });
     }
+
+    // ── App selector event listeners ──
+    attachAppSelectorListeners(element, opts);
 
     // ── Search event listeners ──
     const container = element.querySelector(`.${CSS_PREFIX}-container`);
@@ -628,6 +705,141 @@ function closeSearch(element, opts) {
     // Return focus to the container for future keyboard shortcuts
     const container = element.querySelector(`.${CSS_PREFIX}-container`);
     if (container) container.focus();
+}
+
+/**
+ * Attach event listeners for the script file selection dropdown.
+ *
+ * Handles input filtering, option selection, clear button, and
+ * outside-click dismissal.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {object} opts - Current render options.
+ *
+ * @returns {void}
+ */
+function attachAppSelectorListeners(element, opts) {
+    const wrapper = element.querySelector(`.${CSS_PREFIX}-appselector`);
+    if (!wrapper) return;
+
+    const input = wrapper.querySelector(`.${CSS_PREFIX}-appselector-input`);
+    const dropdown = wrapper.querySelector(`.${CSS_PREFIX}-appselector-dropdown`);
+    const clearBtn = wrapper.querySelector(`.${CSS_PREFIX}-appselector-clear`);
+    if (!input || !dropdown) return;
+
+    const allOptions = dropdown.querySelectorAll(`.${CSS_PREFIX}-appselector-option`);
+
+    /**
+     * Show/hide dropdown options based on the current filter text.
+     *
+     * @param {string} filter - Filter text (case-insensitive).
+     */
+    function filterOptions(filter) {
+        const lowerFilter = filter.toLowerCase();
+        let anyVisible = false;
+        allOptions.forEach((opt) => {
+            const text = opt.dataset.value || '';
+            const match = !lowerFilter || text.toLowerCase().includes(lowerFilter);
+            opt.style.display = match ? '' : 'none';
+            if (match) anyVisible = true;
+        });
+        dropdown.style.display = anyVisible ? '' : 'none';
+    }
+
+    // Show dropdown on focus
+    input.addEventListener('focus', () => {
+        filterOptions(input.value);
+        dropdown.style.display = '';
+    });
+
+    // Real-time filtering as the user types
+    input.addEventListener('input', () => {
+        filterOptions(input.value);
+        if (clearBtn) {
+            clearBtn.style.display = input.value ? '' : 'none';
+        }
+    });
+
+    // Handle keyboard in the input
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            dropdown.style.display = 'none';
+            input.blur();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            // Select the first visible option
+            const firstVisible = dropdown.querySelector(
+                `.${CSS_PREFIX}-appselector-option:not([style*="display: none"])`
+            );
+            if (firstVisible) {
+                const value = firstVisible.dataset.value;
+                input.value = value;
+                dropdown.style.display = 'none';
+                if (typeof opts.onAppSelect === 'function') {
+                    opts.onAppSelect(value);
+                }
+            }
+        }
+    });
+
+    // Option click handler
+    allOptions.forEach((opt) => {
+        opt.addEventListener('click', () => {
+            const value = opt.dataset.value;
+            input.value = value;
+            dropdown.style.display = 'none';
+            if (typeof opts.onAppSelect === 'function') {
+                opts.onAppSelect(value);
+            }
+        });
+    });
+
+    // Clear button
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            if (clearBtn) clearBtn.style.display = 'none';
+            dropdown.style.display = 'none';
+            if (typeof opts.onAppSelect === 'function') {
+                opts.onAppSelect(null);
+            }
+        });
+    }
+
+    // Close dropdown when focus leaves the selector widget
+    wrapper.addEventListener('focusout', () => {
+        // Delay slightly to allow click on dropdown options to register
+        setTimeout(() => {
+            if (!wrapper.contains(document.activeElement)) {
+                dropdown.style.display = 'none';
+            }
+        }, 150);
+    });
+
+    // Also close on mousedown outside (handles clicks on non-focusable areas)
+    /**
+     * Close the dropdown when clicking outside the selector widget.
+     *
+     * @param {MouseEvent} evt - The mousedown event.
+     */
+    const onOutsideClick = (evt) => {
+        if (!wrapper.contains(evt.target)) {
+            dropdown.style.display = 'none';
+        }
+    };
+    // Use mousedown so it fires before the blur event
+    document.addEventListener('mousedown', onOutsideClick);
+
+    // Clean up the document listener when the element is removed from the DOM
+    // (renderSection replaces innerHTML, destroying the wrapper)
+    const observer = new MutationObserver(() => {
+        if (!document.contains(wrapper)) {
+            document.removeEventListener('mousedown', onOutsideClick);
+            observer.disconnect();
+        }
+    });
+    observer.observe(element, { childList: true });
 }
 
 /**
