@@ -1,0 +1,125 @@
+name: ci
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - main
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+jobs:
+    release-please:
+        runs-on: ubuntu-latest
+        outputs:
+            releases_created: ${{ steps.release.outputs.releases_created }}
+            release_tag_name: ${{ steps.release.outputs['tag_name'] }}
+            release_version: ${{ steps.release.outputs['version'] }}
+            release_upload_url: ${{ steps.release.outputs['upload_url'] }}
+        env:
+            GITHUB_REF: ${{ github.ref }}
+        steps:
+            - name: Show github.ref
+              run: echo "$GITHUB_REF"
+
+            - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+              id: release
+              if: github.repository_owner == 'ptarmiganlabs'
+              with:
+                  token: ${{ secrets.RELEASE_PLEASE_PAT }}
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json
+                  target-branch: main
+
+            - name: Show output from Release-Please
+              if: always()
+              env:
+                  RELEASE_PLEASE_OUTPUT: ${{ toJSON(steps.release.outputs) }}
+              run: echo "$RELEASE_PLEASE_OUTPUT"
+
+    build-release:
+        needs: release-please
+        runs-on: ubuntu-latest
+        if: needs.release-please.outputs.releases_created == 'true'
+        permissions:
+            contents: write
+        env:
+            DIST_FILE_NAME: qvsview-qs
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+            - name: Setup Node.js
+              uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 22
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Install Puppeteer Chrome browser
+              run: npx puppeteer browsers install chrome
+
+            - name: Build CDN variant (light)
+              run: npm run pack:prod
+
+            - name: Stash CDN variant artifacts
+              run: |
+                  mkdir -p build-cdn
+                  cp "${DIST_FILE_NAME}.zip" build-cdn/
+                  cp README.pdf build-cdn/
+
+            - name: Build air-gapped variant (full)
+              run: npm run pack:prod:airgap
+
+            - name: Stash air-gapped variant artifacts
+              run: |
+                  mkdir -p build-airgap
+                  cp "${DIST_FILE_NAME}.zip" build-airgap/
+
+            - name: Assemble release packages
+              env:
+                  VERSION: ${{ needs.release-please.outputs.release_version }}
+              run: |
+                  # --- CDN variant ---
+                  mkdir -p staging-cdn
+                  cp "build-cdn/${DIST_FILE_NAME}.zip" "staging-cdn/${DIST_FILE_NAME}.zip"
+                  sed -e "s/__VERSION__/${VERSION}/g" -e "s/__VARIANT__/CDN (light)/g" \
+                    release-config/readme-template.txt > staging-cdn/readme.txt
+                  cp LICENSE staging-cdn/LICENSE
+                  cp build-cdn/README.pdf staging-cdn/README.pdf
+                  (cd staging-cdn && zip -r "../${DIST_FILE_NAME}-v${VERSION}-cdn.zip" .)
+
+                  # --- Air-gapped variant ---
+                  mkdir -p staging-airgap
+                  cp "build-airgap/${DIST_FILE_NAME}.zip" "staging-airgap/${DIST_FILE_NAME}.zip"
+                  sed -e "s/__VERSION__/${VERSION}/g" -e "s/__VARIANT__/Air-gapped (full)/g" \
+                    release-config/readme-template.txt > staging-airgap/readme.txt
+                  cp LICENSE staging-airgap/LICENSE
+                  cp build-cdn/README.pdf staging-airgap/README.pdf
+                  (cd staging-airgap && zip -r "../${DIST_FILE_NAME}-v${VERSION}-airgap.zip" .)
+
+            - name: List release zip contents (debug)
+              env:
+                  VERSION: ${{ needs.release-please.outputs.release_version }}
+              run: |
+                  echo "=== CDN outer release zip ==="
+                  zipinfo "${DIST_FILE_NAME}-v${VERSION}-cdn.zip"
+                  echo ""
+                  echo "=== CDN inner extension zip ==="
+                  zipinfo "staging-cdn/${DIST_FILE_NAME}.zip"
+                  echo ""
+                  echo "=== Air-gapped outer release zip ==="
+                  zipinfo "${DIST_FILE_NAME}-v${VERSION}-airgap.zip"
+                  echo ""
+                  echo "=== Air-gapped inner extension zip ==="
+                  zipinfo "staging-airgap/${DIST_FILE_NAME}.zip"
+
+            - name: Upload release artifacts
+              uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
+              with:
+                  allowUpdates: true
+                  omitBodyDuringUpdate: true
+                  omitNameDuringUpdate: true
+                  omitDraftDuringUpdate: true
+                  tag: ${{ needs.release-please.outputs.release_tag_name }}
+                  artifacts: '${{ env.DIST_FILE_NAME }}-v${{ needs.release-please.outputs.release_version }}-cdn.zip,${{ env.DIST_FILE_NAME }}-v${{ needs.release-please.outputs.release_version }}-airgap.zip'
+                  token: ${{ secrets.GITHUB_TOKEN }}

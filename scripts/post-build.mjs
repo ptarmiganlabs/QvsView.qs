@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir, copyFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -22,11 +22,12 @@ const BUNDLE_METADATA = {
 async function main() {
     const pkg = JSON.parse(await readFile('package.json', 'utf-8'));
     const buildType = process.env.BUILD_TYPE || 'development';
+    const buildVariant = process.env.BUILD_VARIANT || 'light';
     const version = pkg.version;
     const buildDate = buildDateString();
 
     console.log(
-        `Post-build: Using BUILD_TYPE=${buildType}, VERSION=${version}, BUILD_DATE=${buildDate}`
+        `Post-build: Using BUILD_TYPE=${buildType}, BUILD_VARIANT=${buildVariant}, VERSION=${version}, BUILD_DATE=${buildDate}`
     );
 
     const targetDirs = ['dist', 'qvsview-qs-ext'];
@@ -43,7 +44,8 @@ async function main() {
                     const newContent = content
                         .replace(/__BUILD_TYPE__/g, JSON.stringify(buildType))
                         .replace(/__PACKAGE_VERSION__/g, JSON.stringify(version))
-                        .replace(/__BUILD_DATE__/g, JSON.stringify(buildDate));
+                        .replace(/__BUILD_DATE__/g, JSON.stringify(buildDate))
+                        .replace(/__BUILD_VARIANT__/g, JSON.stringify(buildVariant));
 
                     if (content !== newContent) {
                         await writeFile(filePath, newContent);
@@ -55,6 +57,27 @@ async function main() {
             if (err.code !== 'ENOENT') {
                 console.error(`Error processing directory ${dir}:`, err);
             }
+        }
+    }
+
+    // Copy mermaid.min.js into the extension folder for the air-gapped variant
+    if (buildVariant === 'full') {
+        const mermaidSrc = join('node_modules', 'mermaid', 'dist', 'mermaid.min.js');
+        const mermaidDst = join('qvsview-qs-ext', 'mermaid.min.js');
+        try {
+            await copyFile(mermaidSrc, mermaidDst);
+            console.log(`Post-build: Copied mermaid.min.js to ${mermaidDst}`);
+        } catch (err) {
+            console.error(`Error copying mermaid.min.js: ${err.message}`);
+            process.exit(1);
+        }
+    } else {
+        // Clean up mermaid.min.js from a previous air-gapped build
+        const mermaidDst = join('qvsview-qs-ext', 'mermaid.min.js');
+        try {
+            await rm(mermaidDst, { force: true });
+        } catch {
+            // Ignore — file may not exist
         }
     }
 

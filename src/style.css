@@ -64,6 +64,7 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    gap: 6px;
     padding: 0 8px;
 }
 
@@ -102,6 +103,24 @@
 .qvs-fontsize-select:hover {
     background: #e8e8e8;
     color: #333;
+}
+
+/* ── AI Analyze button ── */
+.qvs-ai-analyze-btn {
+    padding: 4px 10px;
+    border: 1px solid #4a90d9;
+    border-radius: 3px;
+    background: #4a90d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.qvs-ai-analyze-btn:hover {
+    background: #357abd;
 }
 
 .qvs-search-hint {
@@ -203,20 +222,69 @@
     font-size: 14px;
 }
 
-/* ── Search bar ── */
-.qvs-search-bar {
+/* ── Multi-app warning ── */
+.qvs-warning {
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #7a5c00;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #fff8e1;
+}
+
+.qvs-warning-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    color: #f9a825;
+}
+
+.qvs-warning-text {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    text-align: center;
+    max-width: 420px;
+}
+
+.qvs-warning-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: #9e7c00;
+    text-align: center;
+}
+
+.qvs-warning-list li {
+    padding: 2px 0;
+}
+
+.qvs-warning-more {
+    margin-top: 4px;
+    font-style: italic;
+    opacity: 0.75;
+}
+
+/* ── Search bar (inline in toolbar) ── */
+.qvs-search-bar {
+    display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 8px;
     flex-shrink: 0;
-    background: #f0f0f0;
-    border-bottom: 1px solid #ddd;
+}
+
+.qvs-search-input-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
 }
 
 .qvs-search-input {
     width: 160px;
-    padding: 3px 6px;
+    padding: 3px 22px 3px 6px;
     border: 1px solid #ccc;
     border-radius: 3px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -224,6 +292,22 @@
     outline: none;
     user-select: text;
     cursor: text;
+}
+
+.qvs-search-clear {
+    position: absolute;
+    right: 3px;
+    padding: 0 3px;
+    border: none;
+    background: transparent;
+    font-size: 11px;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.qvs-search-clear:hover {
+    color: #333;
 }
 
 .qvs-search-input:focus {
@@ -394,4 +478,484 @@
     content: '\200b';
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 11px;
+}
+
+/* ─────────────────────────────────────────────── */
+/* ── AI Analysis Modal                         ── */
+/* ─────────────────────────────────────────────── */
+
+.qvs-ai-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.qvs-ai-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 90vw;
+    max-width: 800px;
+    max-height: 85vh;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+
+.qvs-ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #fafafa;
+}
+
+.qvs-ai-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+}
+
+.qvs-ai-close {
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+    border-radius: 4px;
+}
+
+.qvs-ai-close:hover {
+    background: #eee;
+    color: #333;
+}
+
+.qvs-ai-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+}
+
+.qvs-ai-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid #e0e0e0;
+    background: #fafafa;
+}
+
+.qvs-ai-btn {
+    padding: 5px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    color: #555;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+
+.qvs-ai-btn:hover {
+    background: #e8e8e8;
+    color: #333;
+}
+
+/* ── Loading state ── */
+.qvs-ai-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px;
+    color: #888;
+}
+
+.qvs-ai-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e0e0e0;
+    border-top-color: #4a90d9;
+    border-radius: 50%;
+    animation: qvs-spin 0.8s linear infinite;
+    margin-bottom: 12px;
+}
+
+@keyframes qvs-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Template badge shown during loading and in result meta */
+.qvs-ai-template-badge {
+    display: inline-block;
+    margin: 0 0 10px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4a90d9;
+    background: #eef4fd;
+    border: 1px solid #c5d9f0;
+    border-radius: 12px;
+}
+
+/* Loading message that cycles */
+.qvs-ai-loading-msg {
+    font-size: 16px;
+    margin: 0 0 6px;
+    min-height: 1.5em;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    width: 100%;
+    background: #fff;
+    transition: opacity 0.3s ease;
+}
+
+.qvs-ai-fade-out {
+    opacity: 0;
+}
+
+.qvs-ai-loading-elapsed {
+    font-size: 12px;
+    color: #aaa;
+    margin: 0 0 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Snake game button */
+.qvs-ai-snake-btn {
+    margin-bottom: 12px;
+    background: #1a1a2e;
+    color: #4ecca3;
+    border: 1px solid #4ecca3;
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition:
+        background 0.2s,
+        color 0.2s;
+}
+
+.qvs-ai-snake-btn:hover {
+    background: #4ecca3;
+    color: #1a1a2e;
+}
+
+/* Snake game area */
+.qvs-ai-snake-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.qvs-ai-snake-canvas {
+    border: 2px solid #4ecca3;
+    border-radius: 4px;
+    outline: none;
+}
+
+.qvs-ai-snake-canvas:focus {
+    box-shadow: 0 0 0 2px rgba(78, 204, 163, 0.3);
+}
+
+.qvs-ai-snake-hud {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 288px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #4ecca3;
+}
+
+.qvs-ai-snake-hint {
+    color: #888;
+}
+
+/* ── Error state ── */
+.qvs-ai-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+    text-align: center;
+    color: #c62828;
+}
+
+.qvs-ai-error-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+}
+
+/* ── Result styling ── */
+.qvs-ai-result h1,
+.qvs-ai-result h2,
+.qvs-ai-result h3,
+.qvs-ai-result h4,
+.qvs-ai-result h5,
+.qvs-ai-result h6 {
+    margin: 1em 0 0.5em;
+    color: #222;
+}
+
+.qvs-ai-result h1 {
+    font-size: 1.5em;
+}
+.qvs-ai-result h2 {
+    font-size: 1.3em;
+}
+.qvs-ai-result h3 {
+    font-size: 1.15em;
+}
+
+.qvs-ai-result p {
+    margin: 0.5em 0;
+}
+
+.qvs-ai-result code {
+    padding: 1px 4px;
+    background: #f4f4f4;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.qvs-ai-result pre {
+    padding: 12px;
+    background: #f8f8f8;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0.8em 0;
+}
+
+.qvs-ai-result pre code {
+    padding: 0;
+    background: none;
+    font-size: 13px;
+}
+
+.qvs-ai-result pre.mermaid {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    text-align: center;
+}
+
+.qvs-ai-result pre.mermaid-error {
+    color: #c62828;
+    background: #fff3f3;
+    border-color: #f5c6cb;
+    white-space: pre-wrap;
+    font-size: 12px;
+}
+
+.qvs-ai-result ul,
+.qvs-ai-result ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+}
+
+.qvs-ai-result li {
+    margin: 0.25em 0;
+}
+
+.qvs-ai-result blockquote {
+    margin: 0.5em 0;
+    padding: 4px 12px;
+    border-left: 3px solid #4a90d9;
+    background: #f8f9ff;
+    color: #555;
+}
+
+.qvs-ai-result hr {
+    border: none;
+    border-top: 1px solid #e0e0e0;
+    margin: 1em 0;
+}
+
+.qvs-ai-result a {
+    color: #4a90d9;
+    text-decoration: none;
+}
+
+.qvs-ai-result a:hover {
+    text-decoration: underline;
+}
+
+/* Tables */
+.qvs-ai-result table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.qvs-ai-result th,
+.qvs-ai-result td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.qvs-ai-result th {
+    background: #f5f7fa;
+    font-weight: 600;
+    color: #333;
+}
+
+.qvs-ai-result tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+.qvs-ai-result tbody tr:hover {
+    background: #f0f4f8;
+}
+
+.qvs-ai-disclaimer {
+    margin-top: 16px;
+    padding: 8px 12px;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 4px;
+    font-size: 11.5px;
+    color: #6d4c00;
+    text-align: center;
+}
+
+.qvs-ai-meta {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+    font-size: 11px;
+    color: #aaa;
+    text-align: right;
+}
+
+/* ── Scope picker ── */
+.qvs-ai-scope-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+}
+
+.qvs-ai-scope-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 20px;
+    color: #333;
+}
+
+.qvs-ai-scope-options {
+    display: flex;
+    gap: 16px;
+}
+
+.qvs-ai-scope-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 20px 28px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    background: #fafafa;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        background 0.15s,
+        box-shadow 0.15s;
+    min-width: 160px;
+}
+
+.qvs-ai-scope-btn:hover {
+    border-color: #4a90d9;
+    background: #f0f6ff;
+    box-shadow: 0 2px 8px rgba(74, 144, 217, 0.15);
+}
+
+.qvs-ai-scope-icon {
+    font-size: 28px;
+}
+
+.qvs-ai-scope-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.qvs-ai-scope-desc {
+    font-size: 11.5px;
+    color: #888;
+}
+
+.qvs-ai-template-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.qvs-ai-template-grid .qvs-ai-scope-btn {
+    min-width: 0;
+    padding: 16px 18px;
+}
+
+/* ── API key prompt ── */
+.qvs-ai-key-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+}
+
+.qvs-ai-key-prompt p {
+    margin: 0 0 12px;
+}
+
+.qvs-ai-key-input {
+    width: 320px;
+    max-width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 14px;
+    outline: none;
+}
+
+.qvs-ai-key-input:focus {
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+.qvs-ai-key-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.qvs-ai-key-note {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #aaa;
 }

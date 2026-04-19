@@ -39,12 +39,17 @@
         "start": "nebula serve",
         "sense": "nebula sense --meta src/meta.json",
         "post-build": "node scripts/post-build.mjs",
+        "generate-pdf": "node scripts/generate-readme-pdf.mjs",
         "zip": "node scripts/zip-extension.mjs",
-        "pack:dev": "cross-env BUILD_TYPE=development npm run build && npm run sense && cross-env BUILD_TYPE=development npm run post-build && npm run zip",
-        "pack:prod": "cross-env BUILD_TYPE=production npm run build:dist && cross-env BUILD_TYPE=production npm run sense && cross-env BUILD_TYPE=production npm run post-build && npm run zip",
+        "pack:dev": "cross-env BUILD_TYPE=development BUILD_VARIANT=light npm run build && npm run sense && cross-env BUILD_TYPE=development BUILD_VARIANT=light npm run post-build && npm run generate-pdf && npm run zip",
+        "pack:dev:airgap": "cross-env BUILD_TYPE=development BUILD_VARIANT=full npm run build && npm run sense && cross-env BUILD_TYPE=development BUILD_VARIANT=full npm run post-build && npm run generate-pdf && npm run zip",
+        "pack:prod": "cross-env BUILD_TYPE=production BUILD_VARIANT=light npm run build:dist && cross-env BUILD_TYPE=production BUILD_VARIANT=light npm run sense && cross-env BUILD_TYPE=production BUILD_VARIANT=light npm run post-build && npm run generate-pdf && npm run zip",
+        "pack:prod:airgap": "cross-env BUILD_TYPE=production BUILD_VARIANT=full npm run build:dist && cross-env BUILD_TYPE=production BUILD_VARIANT=full npm run sense && cross-env BUILD_TYPE=production BUILD_VARIANT=full npm run post-build && npm run generate-pdf && npm run zip",
         "prepare": "husky"
     },
-    "dependencies": {},
+    "dependencies": {
+        "dompurify": "^3.4.0"
+    },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@nebula.js/cli": "^6.8.0",
@@ -60,6 +65,8 @@
         "globals": "^17.4.0",
         "husky": "^9.1.7",
         "lint-staged": "^16.4.0",
+        "md-to-pdf": "^5.2.5",
+        "mermaid": "^11.14.0",
         "prettier": "^3.8.1"
     },
     "peerDependencies": {

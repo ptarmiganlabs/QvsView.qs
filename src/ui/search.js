@@ -13,19 +13,26 @@ const CSS_PREFIX = 'qvs';
  * @param {string} [query] - Current search query (pre-filled).
  * @param {number} [current] - Current match index (0-based).
  * @param {number} [total] - Total match count.
+ * @param {boolean} [persistent] - Whether the bar is always visible (hides close button).
  *
  * @returns {string} HTML string for the search bar row.
  */
-export function buildSearchBar(query = '', current = 0, total = 0) {
+export function buildSearchBar(query = '', current = 0, total = 0, persistent = false) {
     const countText = query ? `${total > 0 ? current + 1 : 0} of ${total}` : '';
+    const closeHTML = persistent
+        ? ''
+        : `<button class="${CSS_PREFIX}-search-close" title="Close (Escape)">&#10005;</button>`;
 
     return `<div class="${CSS_PREFIX}-search-bar">
-        <input class="${CSS_PREFIX}-search-input" type="text" placeholder="Find\u2026"
-               value="${escapeAttr(query)}" spellcheck="false" autocomplete="off" />
+        <span class="${CSS_PREFIX}-search-input-wrap">
+            <input class="${CSS_PREFIX}-search-input" type="text" placeholder="Find\u2026"
+                   value="${escapeAttr(query)}" spellcheck="false" autocomplete="off" />
+            <button class="${CSS_PREFIX}-search-clear" title="Clear"${query ? '' : ' style="display:none"'}>&#10005;</button>
+        </span>
         <span class="${CSS_PREFIX}-search-count">${countText}</span>
         <button class="${CSS_PREFIX}-search-prev" title="Previous match (Shift+Enter)"${total <= 0 ? ' disabled' : ''}>&#9650;</button>
         <button class="${CSS_PREFIX}-search-next" title="Next match (Enter)"${total <= 0 ? ' disabled' : ''}>&#9660;</button>
-        <button class="${CSS_PREFIX}-search-close" title="Close (Escape)">&#10005;</button>
+        ${closeHTML}
     </div>`;
 }
 

@@ -12,6 +12,9 @@ export const PACKAGE_VERSION = __PACKAGE_VERSION__;
 /** @type {string} */
 export const BUILD_DATE = __BUILD_DATE__;
 
+/** @type {string} */
+export const BUILD_VARIANT = __BUILD_VARIANT__;
+
 const IS_PRODUCTION = BUILD_TYPE === 'production';
 
 const PREFIX = 'QvsView.qs';

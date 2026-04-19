@@ -14,6 +14,7 @@
 
 import { viewerSection } from './viewer-section.js';
 import { toolbarSection } from './toolbar-section.js';
+import { aiSection } from './ai-section.js';
 import { aboutSection } from './about-section.js';
 
 /**
@@ -41,6 +42,7 @@ export default function ext(_galaxy) {
                 },
                 viewerSection: viewerSection(),
                 toolbarSection: toolbarSection(),
+                aiSection: aiSection(),
                 appearance: {
                     uses: 'settings',
                 },

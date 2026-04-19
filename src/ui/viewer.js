@@ -52,28 +52,25 @@ function buildTabBar(sections, activeIndex) {
 }
 
 /**
- * Detect the platform modifier key label.
- *
- * @returns {string} "Cmd" on Mac, "Ctrl" otherwise.
- */
-function modKey() {
-    return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-        ? 'Cmd'
-        : 'Ctrl';
-}
-
-/**
- * Build the toolbar HTML (copy button + search hint + optional font size dropdown).
+ * Build the toolbar HTML (optional search bar + font size dropdown + copy button + AI analyze).
  *
  * @param {object} toolbarOpts - Toolbar display options.
  * @param {boolean} toolbarOpts.showCopyButton - Whether to show the copy button.
  * @param {boolean} toolbarOpts.showFontSizeDropdown - Whether to show the font size dropdown.
  * @param {number} toolbarOpts.fontSize - Current font size value.
+ * @param {string} [toolbarOpts.searchHTML] - Pre-built search bar HTML to include.
+ * @param {boolean} [toolbarOpts.showAiAnalysis] - Whether to show the AI Analyze button.
  *
  * @returns {string} HTML string for the toolbar.
  */
 function buildToolbar(toolbarOpts) {
-    const { showCopyButton = true, showFontSizeDropdown = false, fontSize = 13 } = toolbarOpts;
+    const {
+        showCopyButton = true,
+        showFontSizeDropdown = false,
+        fontSize = 13,
+        searchHTML = '',
+        showAiAnalysis = false,
+    } = toolbarOpts;
 
     const sizes = [10, 11, 12, 13, 14, 16, 18, 20];
     const fontSizeHTML = showFontSizeDropdown
@@ -84,10 +81,15 @@ function buildToolbar(toolbarOpts) {
         ? `<button class="${CSS_PREFIX}-copy-btn" title="Copy to clipboard">&#128203; Copy</button>`
         : '';
 
+    const aiHTML = showAiAnalysis
+        ? `<button class="${CSS_PREFIX}-ai-analyze-btn" title="AI Script Analysis">🤖 Analyze</button>`
+        : '';
+
     return `<div class="${CSS_PREFIX}-toolbar">
+        ${searchHTML}
         ${fontSizeHTML}
-        <span class="${CSS_PREFIX}-search-hint" title="Open search">${modKey()}+F</span>
         ${copyHTML}
+        ${aiHTML}
     </div>`;
 }
 
@@ -117,6 +119,10 @@ export function renderViewer(element, options) {
         enableFolding = true,
         showCopyButton = true,
         showFontSizeDropdown = false,
+        showSearch = false,
+        showAiAnalysis = false,
+        aiConfig = null,
+        onAiAnalyze = null,
     } = options;
 
     const sections = parseSections(script);
@@ -124,6 +130,11 @@ export function renderViewer(element, options) {
     // Preserve active tab across re-renders if possible
     const prevIndex = parseInt(element.dataset.qvsActiveSection || '0', 10);
     const activeIndex = prevIndex < sections.length ? prevIndex : 0;
+
+    // When showSearch is enabled via property panel, auto-open the search bar
+    if (showSearch) {
+        element.dataset.qvsSearchOpen = '1';
+    }
 
     renderSection(element, {
         sections,
@@ -135,6 +146,10 @@ export function renderViewer(element, options) {
         enableFolding,
         showCopyButton,
         showFontSizeDropdown,
+        showSearch,
+        showAiAnalysis,
+        aiConfig,
+        onAiAnalyze,
     });
 }
 
@@ -166,6 +181,9 @@ function renderSection(element, opts) {
         enableFolding,
         showCopyButton,
         showFontSizeDropdown,
+        showSearch,
+        showAiAnalysis,
+        aiConfig,
     } = opts;
 
     const section = sections[activeIndex];
@@ -174,7 +192,7 @@ function renderSection(element, opts) {
     const tokenizedLines = tokenize(sectionScript);
     const codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
     const lineCount = tokenizedLines.length;
-    const lineOffset = section.startLine + (sections.length > 1 ? 1 : 0); // offset for ///$tab line
+    const lineOffset = 0; // each section starts line-numbering at 1
 
     const wrapClass = wordWrap ? `${CSS_PREFIX}-wrap` : '';
 
@@ -286,13 +304,16 @@ function renderSection(element, opts) {
 
     element.dataset.qvsActiveSection = String(activeIndex);
 
+    const searchHTML = searchActive
+        ? buildSearchBar(searchQuery, activeMatchIndex, matches.length, showSearch)
+        : '';
+
     element.innerHTML = `
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
                 ${buildTabBar(sections, activeIndex)}
-                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize })}
+                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
             </div>
-            ${searchActive ? buildSearchBar(searchQuery, activeMatchIndex, matches.length) : ''}
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
               <div class="${CSS_PREFIX}-viewer-inner">
                 ${gutterHTML}
@@ -380,6 +401,22 @@ function renderSection(element, opts) {
         });
     }
 
+    // AI Analyze button handler
+    const aiBtn = element.querySelector(`.${CSS_PREFIX}-ai-analyze-btn`);
+    if (aiBtn && aiConfig) {
+        aiBtn.addEventListener('click', () => {
+            if (typeof opts.onAiAnalyze === 'function') {
+                opts.onAiAnalyze({
+                    sectionScript,
+                    fullScript,
+                    sectionCount: opts.sections.length,
+                    activeSectionName: section.name,
+                    containerEl: element,
+                });
+            }
+        });
+    }
+
     // Font size dropdown handler
     const fontSizeSelect = element.querySelector(`.${CSS_PREFIX}-fontsize-select`);
     if (fontSizeSelect) {
@@ -433,8 +470,12 @@ function renderSection(element, opts) {
 
         // Live search on input — update highlights without replacing search bar
         let debounceTimer = null;
+        const clearBtn2 = element.querySelector(`.${CSS_PREFIX}-search-clear`);
         searchInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
+            if (clearBtn2) {
+                clearBtn2.style.display = searchInput.value ? '' : 'none';
+            }
             debounceTimer = setTimeout(() => {
                 const query = searchInput.value;
                 element.dataset.qvsSearchQuery = query;
@@ -460,6 +501,19 @@ function renderSection(element, opts) {
         const nextBtn = element.querySelector(`.${CSS_PREFIX}-search-next`);
         if (prevBtn) prevBtn.addEventListener('click', () => navigateMatch(element, opts, -1));
         if (nextBtn) nextBtn.addEventListener('click', () => navigateMatch(element, opts, 1));
+
+        // Clear button inside input
+        const clearBtn = element.querySelector(`.${CSS_PREFIX}-search-clear`);
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                element.dataset.qvsSearchQuery = '';
+                element.dataset.qvsSearchMatch = '0';
+                clearBtn.style.display = 'none';
+                updateCodeHighlights(element, opts);
+                searchInput.focus();
+            });
+        }
 
         // Close button
         const closeBtn = element.querySelector(`.${CSS_PREFIX}-search-close`);
@@ -557,6 +611,15 @@ function navigateMatch(element, opts, direction) {
  * @returns {void}
  */
 function closeSearch(element, opts) {
+    // If showSearch is on via property panel, keep the bar visible but clear the query
+    if (opts.showSearch) {
+        element.dataset.qvsSearchQuery = '';
+        element.dataset.qvsSearchMatch = '0';
+        renderSection(element, opts);
+        const input = element.querySelector(`.${CSS_PREFIX}-search-input`);
+        if (input) input.focus();
+        return;
+    }
     element.dataset.qvsSearchOpen = '0';
     element.dataset.qvsSearchQuery = '';
     element.dataset.qvsSearchMatch = '0';
@@ -580,6 +643,39 @@ export function renderPlaceholder(element, message = 'Add a dimension containing
         <div class="${CSS_PREFIX}-placeholder">
             <div class="${CSS_PREFIX}-placeholder-icon">&#60;/&#62;</div>
             <div class="${CSS_PREFIX}-placeholder-text">${message}</div>
+        </div>
+    `;
+}
+
+/**
+ * Render a warning when multiple script sources are detected.
+ *
+ * Shows an amber-tinted warning with the list of detected sources so the
+ * user knows they need to filter to a single script before viewing.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {string} message - Warning message to display.
+ * @param {string[]} identifiers - List of distinct source identifiers.
+ *
+ * @returns {void}
+ */
+export function renderWarning(element, message, identifiers) {
+    const ids = identifiers || [];
+    const MAX_SHOWN = 5;
+    const shown = ids.slice(0, MAX_SHOWN);
+    const remaining = ids.length - shown.length;
+
+    const listItems = shown.map((id) => `<li>${escapeHTML(id)}</li>`).join('');
+    const moreText =
+        remaining > 0
+            ? `<li class="${CSS_PREFIX}-warning-more">…and ${remaining} more script${remaining === 1 ? '' : 's'} selected</li>`
+            : '';
+
+    element.innerHTML = `
+        <div class="${CSS_PREFIX}-warning">
+            <div class="${CSS_PREFIX}-warning-icon">&#9888;</div>
+            <div class="${CSS_PREFIX}-warning-text">${escapeHTML(message)}</div>
+            <ul class="${CSS_PREFIX}-warning-list">${listItems}${moreText}</ul>
         </div>
     `;
 }
