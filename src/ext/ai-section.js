@@ -183,9 +183,7 @@ function getOpenAIModels(endpoint, apiKey) {
             })
             .catch(() => {
                 openaiModels = [];
-                openaiModelsEndpoint = '';
-                openaiModelsKey = '';
-                openaiFetchDone = false;
+                openaiFetchDone = true;
             })
             .finally(() => {
                 openaiFetchPromise = null;
