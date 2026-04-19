@@ -37,6 +37,35 @@ let openaiFetchDone = false;
 /** @type {object|null} Captured property panel handler from options() */
 let openaiHandler = null;
 
+/**
+ * Force the OpenAI portion of the property panel to re-render by updating
+ * a timestamp property.
+ *
+ * This is used after asynchronous model fetch completion so dropdown options
+ * reflect the latest state, including an empty result set.
+ *
+ * @returns {void}
+ */
+function triggerOpenAIModelsRerender() {
+    const handler = openaiHandler;
+    if (handler?.app) {
+        const qId = handler.properties?.qInfo?.qId;
+        if (qId) {
+            handler.app
+                .getObject(qId)
+                .then((obj) =>
+                    obj.getProperties().then((props) => {
+                        if (!props.ai) props.ai = {};
+                        if (!props.ai.openai) props.ai.openai = {};
+                        props.ai.openai._ts = String(Date.now());
+                        return obj.setProperties(props);
+                    })
+                )
+                .catch(() => {});
+        }
+    }
+}
+
 /** @type {Array<{value: string, label: string}>} */
 let anthropicModels = [];
 
@@ -153,19 +182,30 @@ function refreshOllamaModels(endpoint) {
  * @returns {Array<{value: string, label: string}>} Current model list.
  */
 function getOpenAIModels(endpoint, apiKey) {
+    const normalizedApiKey = apiKey || '';
+    const configChanged =
+        openaiModelsEndpoint !== endpoint || openaiModelsKey !== normalizedApiKey;
+
     if (
         openaiModelsEndpoint === endpoint &&
-        openaiModelsKey === (apiKey || '') &&
+        openaiModelsKey === normalizedApiKey &&
         openaiFetchDone
     ) {
         return openaiModels;
+    }
+
+    if (configChanged && !openaiFetchPromise) {
+        openaiModels = [];
+        openaiModelsEndpoint = '';
+        openaiModelsKey = '';
+        openaiFetchDone = false;
     }
 
     if (!apiKey) return openaiModels;
 
     if (!openaiFetchPromise) {
         openaiModelsEndpoint = endpoint;
-        openaiModelsKey = apiKey;
+        openaiModelsKey = normalizedApiKey;
         const url = endpoint.replace(/\/+$/, '');
 
         openaiFetchPromise = fetch(`${url}/models`, {
@@ -187,25 +227,7 @@ function getOpenAIModels(endpoint, apiKey) {
             })
             .finally(() => {
                 openaiFetchPromise = null;
-                if (openaiModels.length > 0) {
-                    const handler = openaiHandler;
-                    if (handler?.app) {
-                        const qId = handler.properties?.qInfo?.qId;
-                        if (qId) {
-                            handler.app
-                                .getObject(qId)
-                                .then((obj) =>
-                                    obj.getProperties().then((props) => {
-                                        if (!props.ai) props.ai = {};
-                                        if (!props.ai.openai) props.ai.openai = {};
-                                        props.ai.openai._ts = String(Date.now());
-                                        return obj.setProperties(props);
-                                    })
-                                )
-                                .catch(() => {});
-                        }
-                    }
-                }
+                triggerOpenAIModelsRerender();
             });
     }
 
