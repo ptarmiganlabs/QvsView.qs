@@ -623,6 +623,15 @@ export function aiSection() {
                         }
                     }
 
+                    if (!apiKey) {
+                        openaiModels = [];
+                        openaiModelsEndpoint = '';
+                        openaiModelsKey = '';
+                        openaiFetchPromise = null;
+                        openaiFetchDone = false;
+                        return [{ value: current, label: current }];
+                    }
+
                     const models = getOpenAIModels(endpoint, apiKey);
 
                     if (models.length > 0) {
