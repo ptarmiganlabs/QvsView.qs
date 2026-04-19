@@ -638,7 +638,7 @@ function closeSearch(element, opts) {
  *
  * @returns {void}
  */
-export function renderPlaceholder(element, message = 'Add a dimension containing script text') {
+export function renderPlaceholder(element, message = 'Add both dimensions to view scripts') {
     element.innerHTML = `
         <div class="${CSS_PREFIX}-placeholder">
             <div class="${CSS_PREFIX}-placeholder-icon">&#60;/&#62;</div>

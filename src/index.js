@@ -155,6 +155,12 @@ export default function supernova(_galaxy) {
             useEffect(() => {
                 if (!layout) return;
 
+                // Both dimensions must be configured before rendering
+                if ((layout.qHyperCube?.qDimensionInfo?.length ?? 0) < 2) {
+                    renderPlaceholder(element, 'Add both dimensions to view scripts');
+                    return;
+                }
+
                 if (!rawRows || rawRows.length === 0) {
                     renderPlaceholder(element);
                     return;

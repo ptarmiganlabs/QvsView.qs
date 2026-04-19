@@ -220,6 +220,8 @@ async function callAnthropic(cfg, system, userMessage, apiKey) {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        // Required for direct browser fetch — Anthropic rejects preflight without this
+        'anthropic-dangerous-direct-browser-access': 'true',
     };
 
     let response;

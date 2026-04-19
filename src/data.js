@@ -1,9 +1,9 @@
 /**
  * Hypercube data target definition for QvsView.qs.
  *
- * Defines up to two dimension targets:
- *   1. (required) The field containing script text — one row per line.
- *   2. (optional) A field identifying the script source (e.g. FileName).
+ * Defines two required dimension targets:
+ *   1. The field containing script text — one row per line.
+ *   2. A field identifying the script source (e.g. FileName).
  *      When multiple distinct values exist, a warning is shown.
  */
 export default {
@@ -11,7 +11,7 @@ export default {
         {
             path: '/qHyperCubeDef',
             dimensions: {
-                min: 1,
+                min: 2,
                 max: 2,
                 /**
                  * Description labels for the dimension picker.
@@ -24,7 +24,7 @@ export default {
                 description(_properties, index) {
                     return index === 0
                         ? 'Field containing script text'
-                        : 'Field identifying the script source (optional)';
+                        : 'Field identifying the script source';
                 },
                 /**
                  * Called when a dimension is added by the user.

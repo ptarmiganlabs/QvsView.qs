@@ -19,6 +19,24 @@ let ollamaFetchDone = false;
 /** @type {object|null} Captured property panel handler from options() */
 let ollamaHandler = null;
 
+/** @type {Array<{value: string, label: string}>} */
+let anthropicModels = [];
+
+/** @type {string} */
+let anthropicModelsEndpoint = '';
+
+/** @type {string} */
+let anthropicModelsKey = '';
+
+/** @type {Promise<void> | null} */
+let anthropicFetchPromise = null;
+
+/** @type {boolean} */
+let anthropicFetchDone = false;
+
+/** @type {object|null} Captured property panel handler from options() */
+let anthropicHandler = null;
+
 /**
  * Trigger a property panel re-render by saving a timestamp through the engine.
  * Uses handler.app.getObject() + obj.setProperties() so Qlik detects the change
@@ -104,6 +122,101 @@ function refreshOllamaModels(endpoint) {
     ollamaFetchPromise = null;
     ollamaFetchDone = false;
     getOllamaModels(endpoint);
+}
+
+/** Anthropic headers required for direct browser fetch. */
+const ANTHROPIC_BROWSER_HEADERS = {
+    'anthropic-version': '2023-06-01',
+    'anthropic-dangerous-direct-browser-access': 'true',
+};
+
+/**
+ * Fetch available models from the Anthropic /v1/models endpoint.
+ * Updates the module-level anthropicModels array when complete.
+ * Automatically triggers a property panel re-render after fetch completes.
+ *
+ * @param {string} endpoint - Anthropic API base URL.
+ * @param {string} [apiKey] - Anthropic API key.
+ *
+ * @returns {Array<{value: string, label: string}>} Current model list.
+ */
+function getAnthropicModels(endpoint, apiKey) {
+    // Return cached if same endpoint + key and already fetched
+    if (
+        anthropicModelsEndpoint === endpoint &&
+        anthropicModelsKey === (apiKey || '') &&
+        anthropicFetchDone
+    ) {
+        return anthropicModels;
+    }
+
+    // Need a key to call the models endpoint
+    if (!apiKey) return anthropicModels;
+
+    // Kick off fetch if not already in-flight
+    if (!anthropicFetchPromise) {
+        anthropicModelsEndpoint = endpoint;
+        anthropicModelsKey = apiKey;
+        const url = endpoint.replace(/\/+$/, '');
+
+        anthropicFetchPromise = fetch(`${url}/models`, {
+            method: 'GET',
+            headers: {
+                'x-api-key': apiKey,
+                ...ANTHROPIC_BROWSER_HEADERS,
+            },
+        })
+            .then((r) => r.json())
+            .then((data) => {
+                anthropicModels = (data.data || [])
+                    .sort((a, b) => a.id.localeCompare(b.id))
+                    .map((m) => ({ value: m.id, label: m.display_name || m.id }));
+                anthropicFetchDone = true;
+            })
+            .catch(() => {
+                /* API unreachable or key invalid — keep existing list */
+                anthropicFetchDone = true;
+            })
+            .finally(() => {
+                anthropicFetchPromise = null;
+                if (anthropicModels.length > 0) {
+                    const handler = anthropicHandler;
+                    if (handler?.app) {
+                        const qId = handler.properties?.qInfo?.qId;
+                        if (qId) {
+                            handler.app
+                                .getObject(qId)
+                                .then((obj) =>
+                                    obj.getProperties().then((props) => {
+                                        if (!props.ai) props.ai = {};
+                                        if (!props.ai.anthropic) props.ai.anthropic = {};
+                                        props.ai.anthropic._ts = String(Date.now());
+                                        return obj.setProperties(props);
+                                    })
+                                )
+                                .catch(() => {});
+                        }
+                    }
+                }
+            });
+    }
+
+    return anthropicModels;
+}
+
+/**
+ * Force-refresh the Anthropic model list by clearing state and re-fetching.
+ *
+ * @param {string} endpoint - Anthropic API base URL.
+ * @param {string} [apiKey] - Anthropic API key.
+ */
+function refreshAnthropicModels(endpoint, apiKey) {
+    anthropicModels = [];
+    anthropicModelsEndpoint = '';
+    anthropicModelsKey = '';
+    anthropicFetchPromise = null;
+    anthropicFetchDone = false;
+    getAnthropicModels(endpoint, apiKey);
 }
 
 /**
@@ -475,7 +588,87 @@ export function aiSection() {
                 type: 'string',
                 label: 'Model',
                 defaultValue: 'claude-sonnet-4-20250514',
-                expression: 'optional',
+                component: 'dropdown',
+                /**
+                 * Return available Anthropic models as dropdown options.
+                 * Fetches from /v1/models using the configured API key.
+                 * Falls back to a placeholder when key is unavailable.
+                 *
+                 * @param {object} data - Extension properties.
+                 * @param {object} [handler] - Property panel handler (Qlik runtime).
+                 *
+                 * @returns {Array<{value: string, label: string}>} Model options.
+                 */
+                options(data, handler) {
+                    if (handler) anthropicHandler = handler;
+                    const props = handler?.properties || data;
+                    const endpoint =
+                        props.ai?.anthropic?.endpoint || 'https://api.anthropic.com/v1';
+                    const keyMode = props.ai?.anthropic?.keyMode || 'prompt';
+                    const current = props.ai?.anthropic?.model || 'claude-sonnet-4-20250514';
+
+                    // Resolve key: stored in properties or cached in sessionStorage
+                    let apiKey = null;
+                    if (keyMode === 'stored') {
+                        apiKey = props.ai?.anthropic?.apiKey || null;
+                    } else {
+                        try {
+                            apiKey = sessionStorage.getItem('qvsview-ai-key-anthropic') || null;
+                        } catch {
+                            /* sessionStorage unavailable */
+                        }
+                    }
+
+                    const models = getAnthropicModels(endpoint, apiKey);
+
+                    if (models.length > 0) {
+                        if (!models.some((m) => m.value === current)) {
+                            return [{ value: current, label: current }, ...models];
+                        }
+                        return models;
+                    }
+
+                    // No models yet — show current value as placeholder
+                    return [{ value: current, label: current }];
+                },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return (
+                        properties.ai?.enabled === true && properties.ai?.provider === 'anthropic'
+                    );
+                },
+            },
+            anthropicRefresh: {
+                label: '🔄 Refresh model list',
+                component: 'button',
+                /**
+                 * Refresh the Anthropic model list when clicked.
+                 * Clears cache and re-fetches from /v1/models.
+                 *
+                 * @param {object} properties - Extension properties.
+                 */
+                action(properties) {
+                    const endpoint =
+                        properties.ai?.anthropic?.endpoint || 'https://api.anthropic.com/v1';
+                    const keyMode = properties.ai?.anthropic?.keyMode || 'prompt';
+                    let apiKey = null;
+                    if (keyMode === 'stored') {
+                        apiKey = properties.ai?.anthropic?.apiKey || null;
+                    } else {
+                        try {
+                            apiKey = sessionStorage.getItem('qvsview-ai-key-anthropic') || null;
+                        } catch {
+                            /* sessionStorage unavailable */
+                        }
+                    }
+                    refreshAnthropicModels(endpoint, apiKey);
+                },
                 /**
                  * Determine visibility based on current properties.
                  *
