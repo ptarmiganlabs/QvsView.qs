@@ -262,6 +262,12 @@
     padding: 2px 0;
 }
 
+.qvs-warning-more {
+    margin-top: 4px;
+    font-style: italic;
+    opacity: 0.75;
+}
+
 /* ── Search bar (inline in toolbar) ── */
 .qvs-search-bar {
     display: inline-flex;
