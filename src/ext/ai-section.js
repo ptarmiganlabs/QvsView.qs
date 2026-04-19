@@ -20,6 +20,24 @@ let ollamaFetchDone = false;
 let ollamaHandler = null;
 
 /** @type {Array<{value: string, label: string}>} */
+let openaiModels = [];
+
+/** @type {string} */
+let openaiModelsEndpoint = '';
+
+/** @type {string} */
+let openaiModelsKey = '';
+
+/** @type {Promise<void> | null} */
+let openaiFetchPromise = null;
+
+/** @type {boolean} */
+let openaiFetchDone = false;
+
+/** @type {object|null} Captured property panel handler from options() */
+let openaiHandler = null;
+
+/** @type {Array<{value: string, label: string}>} */
 let anthropicModels = [];
 
 /** @type {string} */
@@ -122,6 +140,90 @@ function refreshOllamaModels(endpoint) {
     ollamaFetchPromise = null;
     ollamaFetchDone = false;
     getOllamaModels(endpoint);
+}
+
+/**
+ * Fetch available models from the OpenAI /v1/models endpoint.
+ * Updates the module-level openaiModels array when complete.
+ * Automatically triggers a property panel re-render after fetch completes.
+ *
+ * @param {string} endpoint - OpenAI API base URL.
+ * @param {string} [apiKey] - OpenAI API key.
+ *
+ * @returns {Array<{value: string, label: string}>} Current model list.
+ */
+function getOpenAIModels(endpoint, apiKey) {
+    if (
+        openaiModelsEndpoint === endpoint &&
+        openaiModelsKey === (apiKey || '') &&
+        openaiFetchDone
+    ) {
+        return openaiModels;
+    }
+
+    if (!apiKey) return openaiModels;
+
+    if (!openaiFetchPromise) {
+        openaiModelsEndpoint = endpoint;
+        openaiModelsKey = apiKey;
+        const url = endpoint.replace(/\/+$/, '');
+
+        openaiFetchPromise = fetch(`${url}/models`, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+        })
+            .then((r) => r.json())
+            .then((data) => {
+                openaiModels = (data.data || [])
+                    .sort((a, b) => a.id.localeCompare(b.id))
+                    .map((m) => ({ value: m.id, label: m.id }));
+                openaiFetchDone = true;
+            })
+            .catch(() => {
+                openaiFetchDone = true;
+            })
+            .finally(() => {
+                openaiFetchPromise = null;
+                if (openaiModels.length > 0) {
+                    const handler = openaiHandler;
+                    if (handler?.app) {
+                        const qId = handler.properties?.qInfo?.qId;
+                        if (qId) {
+                            handler.app
+                                .getObject(qId)
+                                .then((obj) =>
+                                    obj.getProperties().then((props) => {
+                                        if (!props.ai) props.ai = {};
+                                        if (!props.ai.openai) props.ai.openai = {};
+                                        props.ai.openai._ts = String(Date.now());
+                                        return obj.setProperties(props);
+                                    })
+                                )
+                                .catch(() => {});
+                        }
+                    }
+                }
+            });
+    }
+
+    return openaiModels;
+}
+
+/**
+ * Force-refresh the OpenAI model list by clearing state and re-fetching.
+ *
+ * @param {string} endpoint - OpenAI API base URL.
+ * @param {string} [apiKey] - OpenAI API key.
+ */
+function refreshOpenAIModels(endpoint, apiKey) {
+    openaiModels = [];
+    openaiModelsEndpoint = '';
+    openaiModelsKey = '';
+    openaiFetchPromise = null;
+    openaiFetchDone = false;
+    getOpenAIModels(endpoint, apiKey);
 }
 
 /** Anthropic headers required for direct browser fetch. */
@@ -492,7 +594,81 @@ export function aiSection() {
                 type: 'string',
                 label: 'Model',
                 defaultValue: 'gpt-4o',
-                expression: 'optional',
+                component: 'dropdown',
+                /**
+                 * Return available OpenAI models as dropdown options.
+                 * Fetches from /v1/models using the configured API key.
+                 * Falls back to a placeholder when key is unavailable.
+                 *
+                 * @param {object} data - Extension properties.
+                 * @param {object} [handler] - Property panel handler (Qlik runtime).
+                 *
+                 * @returns {Array<{value: string, label: string}>} Model options.
+                 */
+                options(data, handler) {
+                    if (handler) openaiHandler = handler;
+                    const props = handler?.properties || data;
+                    const endpoint = props.ai?.openai?.endpoint || 'https://api.openai.com/v1';
+                    const keyMode = props.ai?.openai?.keyMode || 'prompt';
+                    const current = props.ai?.openai?.model || 'gpt-4o';
+
+                    let apiKey = null;
+                    if (keyMode === 'stored') {
+                        apiKey = props.ai?.openai?.apiKey || null;
+                    } else {
+                        try {
+                            apiKey = sessionStorage.getItem('qvsview-ai-key-openai') || null;
+                        } catch {
+                            /* sessionStorage unavailable */
+                        }
+                    }
+
+                    const models = getOpenAIModels(endpoint, apiKey);
+
+                    if (models.length > 0) {
+                        if (!models.some((m) => m.value === current)) {
+                            return [{ value: current, label: current }, ...models];
+                        }
+                        return models;
+                    }
+
+                    return [{ value: current, label: current }];
+                },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return properties.ai?.enabled === true && properties.ai?.provider === 'openai';
+                },
+            },
+            openaiRefresh: {
+                label: '🔄 Refresh model list',
+                component: 'button',
+                /**
+                 * Refresh the OpenAI model list when clicked.
+                 * Clears cache and re-fetches from /v1/models.
+                 *
+                 * @param {object} properties - Extension properties.
+                 */
+                action(properties) {
+                    const endpoint = properties.ai?.openai?.endpoint || 'https://api.openai.com/v1';
+                    const keyMode = properties.ai?.openai?.keyMode || 'prompt';
+                    let apiKey = null;
+                    if (keyMode === 'stored') {
+                        apiKey = properties.ai?.openai?.apiKey || null;
+                    } else {
+                        try {
+                            apiKey = sessionStorage.getItem('qvsview-ai-key-openai') || null;
+                        } catch {
+                            /* sessionStorage unavailable */
+                        }
+                    }
+                    refreshOpenAIModels(endpoint, apiKey);
+                },
                 /**
                  * Determine visibility based on current properties.
                  *
