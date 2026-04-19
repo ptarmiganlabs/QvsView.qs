@@ -619,6 +619,16 @@ export function aiSection() {
                         }
                     }
 
+                    if (!apiKey) {
+                        anthropicModels = [];
+                        anthropicModelsEndpoint = '';
+                        anthropicModelsKey = '';
+                        anthropicFetchPromise = null;
+                        anthropicFetchDone = false;
+
+                        // No key available — show current value as placeholder
+                        return [{ value: current, label: current }];
+                    }
                     const models = getAnthropicModels(endpoint, apiKey);
 
                     if (models.length > 0) {
