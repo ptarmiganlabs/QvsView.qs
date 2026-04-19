@@ -135,20 +135,28 @@ function Get-QrsApps {
         }
     }
 
-    # Build curl command string directly (cross-platform, avoids PowerShell arg parsing issues)
-    $curlCmd = "curl -s -L --cert '$CertFile' --key '$CertKeyFile' --cacert '$RootCertFile'"
+    # Build curl argument array and invoke curl directly so PowerShell handles quoting safely
+    $curlArgs = @(
+        "-s"
+        "-L"
+        "--cert", $CertFile
+        "--key", $CertKeyFile
+        "--cacert", $RootCertFile
+    )
     if ($InsecureSsl) {
-        $curlCmd += " -k"
+        $curlArgs += "-k"
     }
-    $curlCmd += " -H 'Accept: application/json'"
-    $curlCmd += " -H 'x-Qlik-Xrfkey: $XrfKey'"
-    $curlCmd += " -H 'X-Qlik-User: UserDirectory=Internal; UserId=sa_repository'"
-    $curlCmd += " -w '%{http_code}'"
-    $curlCmd += " '$url'"
+    $curlArgs += @(
+        "-H", "Accept: application/json"
+        "-H", "x-Qlik-Xrfkey: $XrfKey"
+        "-H", "X-Qlik-User: UserDirectory=Internal; UserId=sa_repository"
+        "-w", "%{http_code}"
+        $url
+    )
 
-    Write-LogDebug "curl command: $curlCmd"
+    Write-LogDebug "Invoking curl with arguments: $($curlArgs -join ' ')"
 
-    $responseStr = Invoke-Expression $curlCmd 2>&1
+    $responseStr = (& curl @curlArgs 2>&1) -join "`n"
 
     # Extract HTTP status code (last 3 chars)
     $httpCode = $responseStr.Substring([Math]::Max(0, $responseStr.Length - 3)).Trim()
@@ -185,9 +193,9 @@ function Extract-AppScript {
 
     Write-LogDebug "Extracting script: app=$AppName (ID: $AppId)"
 
-    # Build Ctrl-Q arguments
-    $args = @(
-        $CtrlQBin, "qseow", "script-get"
+    # Build Ctrl-Q argument list (binary excluded — called separately via & operator)
+    $ctrlQArgs = @(
+        "qseow", "script-get"
         "--host", $HostName
         "--port", $Port
         "--app-id", $AppId
@@ -197,16 +205,16 @@ function Extract-AppScript {
     )
 
     if ($InsecureSsl) {
-        $args += "--secure", "false"
+        $ctrlQArgs += "--secure", "false"
     } else {
-        $args += "--secure", "true"
+        $ctrlQArgs += "--secure", "true"
     }
 
     if ($VirtualProxy) {
-        $args += "--virtual-proxy", $VirtualProxy
+        $ctrlQArgs += "--virtual-proxy", $VirtualProxy
     }
 
-    $args += @(
+    $ctrlQArgs += @(
         "--auth-user-dir", $AuthUserDir
         "--auth-user-id", $AuthUserId
         "--auth-cert-file", $CertFile
@@ -214,10 +222,10 @@ function Extract-AppScript {
         "--auth-root-cert-file", $RootCertFile
     )
 
-    Write-LogDebug "Ctrl-Q command: $($args -join ' ')"
+    Write-LogDebug "Ctrl-Q command: $CtrlQBin $($ctrlQArgs -join ' ')"
 
-    # Execute Ctrl-Q via bash (cross-platform compatible)
-    $output = bash -c ($args -join ' ') 2>&1
+    # Execute Ctrl-Q directly using the PowerShell call operator so argument quoting is safe
+    $output = & $CtrlQBin @ctrlQArgs 2>&1
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0 -or -not $output) {

@@ -12,7 +12,7 @@ Extracts load scripts from Qlik Sense applications to `.qvs` files.
 ## Requirements
 
 - **Ctrl-Q**: [Ptarmigan Labs Ctrl-Q](https://ctrl-q.ptarmiganlabs.com/)
-    - Default path: `/Users/goran/tools/ctrl-q/ctrl-q`
+    - Configure the script with the path to your local Ctrl-Q binary (for example, `/path/to/ctrl-q` or `C:\path\to\ctrl-q.exe`)
     - Qlik Sense certificates for authentication
 
 ## Usage (Bash)

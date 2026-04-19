@@ -112,7 +112,7 @@ const LOADING_MESSAGES = [
  * @param {string} [opts.promptTemplateMode] - 'properties' (default) or 'runtime'.
  * @param {string} [opts.fixedPromptTemplate] - Template key when mode is 'properties'.
  *
- * @returns {{ close: () => void, showLoading: () => void, showError: (msg: string) => void, showResult: (content: string, meta: object) => Promise<void>, promptApiKey: (provider: string) => Promise<string|null>, runAnalysis: (bypassCache?: boolean) => Promise<void> }} Controller object.
+ * @returns {{ close: () => void, showLoading: (templateKey?: string) => void, showError: (msg: string) => void, showResult: (content: string, meta: object) => Promise<void>, promptApiKey: (provider: string) => Promise<string|null>, runAnalysis: (bypassCache?: boolean) => Promise<void> }} Controller object.
  */
 export function showAiModal({
     container,
@@ -172,9 +172,22 @@ export function showAiModal({
     let loadingTimers = { message: null, elapsed: null };
     let snakeCleanup = null;
 
+    /**
+     * Registry of pending picker resolvers — resolved with null when the modal closes,
+     * so awaiting callers (scope picker, template picker) do not hang forever.
+     *
+     * @type {Set<(value: null) => void>}
+     */
+    const pendingResolvers = new Set();
+
     // ── Close handler ──
     /** Remove the modal from the DOM and clean up all listeners and timers. */
     function close() {
+        // Cancel any pending scope / template pickers
+        for (const resolve of pendingResolvers) {
+            resolve(null);
+        }
+        pendingResolvers.clear();
         document.removeEventListener('keydown', handleKeydown);
         backdrop.removeEventListener('click', handleBackdropClick);
         clearLoadingTimers();
@@ -437,6 +450,7 @@ export function showAiModal({
      */
     function promptScope() {
         return new Promise((resolve) => {
+            pendingResolvers.add(resolve);
             const safeName = escapeHtml(activeSectionName);
             body.innerHTML = `
                 <div class="${CSS_PREFIX}-ai-scope-prompt">
@@ -459,6 +473,7 @@ export function showAiModal({
 
             body.querySelectorAll(`.${CSS_PREFIX}-ai-scope-btn`).forEach((btn) => {
                 btn.addEventListener('click', () => {
+                    pendingResolvers.delete(resolve);
                     resolve(btn.dataset.scope);
                 });
             });
@@ -477,6 +492,7 @@ export function showAiModal({
      */
     function promptTemplateChoice() {
         return new Promise((resolve) => {
+            pendingResolvers.add(resolve);
             body.innerHTML = `
                 <div class="${CSS_PREFIX}-ai-scope-prompt">
                     <p class="${CSS_PREFIX}-ai-scope-title">Choose analysis type</p>
@@ -508,6 +524,7 @@ export function showAiModal({
 
             body.querySelectorAll(`.${CSS_PREFIX}-ai-scope-btn`).forEach((btn) => {
                 btn.addEventListener('click', () => {
+                    pendingResolvers.delete(resolve);
                     resolve(btn.dataset.template);
                 });
             });

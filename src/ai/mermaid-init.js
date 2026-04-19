@@ -128,11 +128,17 @@ function sanitizeErDiagram(code) {
             }
 
             // Relationship line: "  entity1 ||--o{ entity2 : "label""
-            // Replace any entity names that were renamed above
+            // Replace any entity names that were renamed above, using word boundaries
+            // to avoid rewriting substrings inside longer identifiers.
             let result = line;
             for (const [original, safe] of entityRenames) {
-                // Use word-boundary-safe replacement (entity names appear as tokens)
-                result = result.replaceAll(original, safe);
+                result = result.replace(
+                    new RegExp(
+                        `(?<![\\w])${original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`,
+                        'g'
+                    ),
+                    safe
+                );
             }
             return result;
         })

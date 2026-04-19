@@ -109,6 +109,7 @@ function convertMarkdown(md) {
         // ── Headings ──
         const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
         if (headingMatch) {
+            closeTable();
             closeList();
             const level = headingMatch[1].length;
             out.push(`<h${level}>${inlineFormat(headingMatch[2])}</h${level}>`);
@@ -117,6 +118,7 @@ function convertMarkdown(md) {
 
         // ── Horizontal rule ──
         if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+            closeTable();
             closeList();
             out.push('<hr>');
             continue;
@@ -124,6 +126,7 @@ function convertMarkdown(md) {
 
         // ── Blockquote ──
         if (line.trimStart().startsWith('> ')) {
+            closeTable();
             closeList();
             out.push(`<blockquote>${inlineFormat(line.replace(/^>\s?/, ''))}</blockquote>`);
             continue;
@@ -132,6 +135,7 @@ function convertMarkdown(md) {
         // ── Ordered list ── (check before unordered to handle nested bullets in OL)
         const olMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
         if (olMatch) {
+            closeTable();
             if (!inList || listType !== 'ol') {
                 closeList();
                 inList = true;
@@ -150,6 +154,7 @@ function convertMarkdown(md) {
                 appendToLastLi(inlineFormat(ulMatch[2]));
                 continue;
             }
+            closeTable();
             if (!inList || listType !== 'ul') {
                 closeList();
                 inList = true;

@@ -284,11 +284,11 @@ main() {
     # Fetch app list from QRS API
     log_info "Fetching app list from QRS API..."
     local apps_json
-    local tags_arg=""
     if [[ ${#APP_TAGS[@]:-0} -gt 0 ]]; then
-        tags_arg="${APP_TAGS[0]}"
+        apps_json=$(get_apps_from_qrs "$QS_HOST" "$QS_CERT_FILE" "$QS_CERT_KEY_FILE" "$QS_ROOT_CERT_FILE" "$INSECURE_SSL" "${APP_TAGS[@]}")
+    else
+        apps_json=$(get_apps_from_qrs "$QS_HOST" "$QS_CERT_FILE" "$QS_CERT_KEY_FILE" "$QS_ROOT_CERT_FILE" "$INSECURE_SSL")
     fi
-    apps_json=$(get_apps_from_qrs "$QS_HOST" "$QS_CERT_FILE" "$QS_CERT_KEY_FILE" "$QS_ROOT_CERT_FILE" "$INSECURE_SSL" "$tags_arg")
 
     if [[ -z "$apps_json" || "$apps_json" == "[]" ]]; then
         log_error "No apps found or QRS connection failed"
