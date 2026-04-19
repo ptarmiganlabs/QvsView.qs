@@ -172,6 +172,29 @@ export function aiSection() {
                 },
             },
 
+            // ── Prompt template mode toggle ──
+            aiPromptTemplateMode: {
+                ref: 'ai.promptTemplateMode',
+                type: 'string',
+                label: 'Prompt template selection',
+                defaultValue: 'properties',
+                component: 'dropdown',
+                options: [
+                    { value: 'properties', label: 'Set in properties' },
+                    { value: 'runtime', label: 'Choose at runtime' },
+                ],
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return properties.ai?.enabled === true;
+                },
+            },
+
             // ── Prompt template ──
             aiTemplate: {
                 ref: 'ai.promptTemplate',
@@ -187,13 +210,17 @@ export function aiSection() {
                 ],
                 /**
                  * Determine visibility based on current properties.
+                 * Only shown when prompt template mode is 'properties'.
                  *
                  * @param {object} properties - Extension properties.
                  *
                  * @returns {boolean} Whether the item is visible.
                  */
                 show(properties) {
-                    return properties.ai?.enabled === true;
+                    return (
+                        properties.ai?.enabled === true &&
+                        properties.ai?.promptTemplateMode !== 'runtime'
+                    );
                 },
             },
 

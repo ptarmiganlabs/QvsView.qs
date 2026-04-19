@@ -7,6 +7,7 @@
  * - Code blocks (fenced with ```)
  * - Unordered and ordered lists
  * - Blockquotes
+ * - Tables (pipe-delimited with header separator)
  * - Links
  * - Horizontal rules
  * - Paragraphs
@@ -30,7 +31,7 @@ export function renderMarkdown(md) {
     const html = convertMarkdown(md);
 
     return DOMPurify.sanitize(html, {
-        ADD_TAGS: ['pre'],
+        ADD_TAGS: ['pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
         ADD_ATTR: ['class', 'data-graph'],
     });
 }
@@ -54,6 +55,9 @@ function convertMarkdown(md) {
 
     let inList = false;
     let listType = '';
+
+    let inTable = false;
+    let tableHeaderDone = false;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -94,6 +98,7 @@ function convertMarkdown(md) {
 
         // ── Blank line ──
         if (line.trim() === '') {
+            closeTable();
             // Don't close list on blank lines — only close on heading/rule/other block content
             if (!inList) {
                 out.push('');
@@ -104,6 +109,7 @@ function convertMarkdown(md) {
         // ── Headings ──
         const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
         if (headingMatch) {
+            closeTable();
             closeList();
             const level = headingMatch[1].length;
             out.push(`<h${level}>${inlineFormat(headingMatch[2])}</h${level}>`);
@@ -112,6 +118,7 @@ function convertMarkdown(md) {
 
         // ── Horizontal rule ──
         if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+            closeTable();
             closeList();
             out.push('<hr>');
             continue;
@@ -119,6 +126,7 @@ function convertMarkdown(md) {
 
         // ── Blockquote ──
         if (line.trimStart().startsWith('> ')) {
+            closeTable();
             closeList();
             out.push(`<blockquote>${inlineFormat(line.replace(/^>\s?/, ''))}</blockquote>`);
             continue;
@@ -127,6 +135,7 @@ function convertMarkdown(md) {
         // ── Ordered list ── (check before unordered to handle nested bullets in OL)
         const olMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
         if (olMatch) {
+            closeTable();
             if (!inList || listType !== 'ol') {
                 closeList();
                 inList = true;
@@ -145,6 +154,7 @@ function convertMarkdown(md) {
                 appendToLastLi(inlineFormat(ulMatch[2]));
                 continue;
             }
+            closeTable();
             if (!inList || listType !== 'ul') {
                 closeList();
                 inList = true;
@@ -161,6 +171,36 @@ function convertMarkdown(md) {
             continue;
         }
 
+        // ── Table rows ──
+        if (isTableRow(line)) {
+            if (inTable) {
+                // Separator line (e.g. |---|---|) — skip, header already emitted
+                if (isTableSeparator(line)) {
+                    continue;
+                }
+                // Body row
+                out.push(buildTableRow(line, 'td'));
+                continue;
+            }
+            // Potential table start — peek ahead for separator line
+            if (i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+                closeList();
+                closeTable();
+                inTable = true;
+                tableHeaderDone = false;
+                out.push('<table>');
+                out.push('<thead>');
+                out.push(buildTableRow(line, 'th'));
+                out.push('</thead>');
+                out.push('<tbody>');
+                tableHeaderDone = true;
+                continue;
+            }
+        }
+
+        // Close table if we hit a non-table line
+        closeTable();
+
         // ── Paragraph ──
         closeList();
         out.push(`<p>${inlineFormat(line)}</p>`);
@@ -168,6 +208,7 @@ function convertMarkdown(md) {
 
     // Close any open blocks
     closeList();
+    closeTable();
     if (inCodeBlock) {
         out.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
     }
@@ -197,6 +238,18 @@ function convertMarkdown(md) {
         }
         out.push(`<p>${html}</p>`);
     }
+
+    /** Close an open table if any. */
+    function closeTable() {
+        if (inTable) {
+            if (tableHeaderDone) {
+                out.push('</tbody>');
+            }
+            out.push('</table>');
+            inTable = false;
+            tableHeaderDone = false;
+        }
+    }
 }
 
 /**
@@ -219,6 +272,49 @@ function inlineFormat(text) {
     // Links
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     return s;
+}
+
+/**
+ * Check if a line looks like a Markdown table row (pipe-delimited with at least two cells).
+ *
+ * @param {string} line - Raw line text.
+ *
+ * @returns {boolean} True if the line is a pipe-delimited row.
+ */
+function isTableRow(line) {
+    const trimmed = line.trim();
+    // Require at least two pipes to distinguish from casual pipe usage in text
+    const pipeCount = (trimmed.match(/\|/g) || []).length;
+    return pipeCount >= 2;
+}
+
+/**
+ * Check if a line is a table header/body separator (e.g. `|---|---|`).
+ *
+ * @param {string} line - Raw line text.
+ *
+ * @returns {boolean} True if the line is a separator row.
+ */
+function isTableSeparator(line) {
+    const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+    return /^[\s|:-]+$/.test(trimmed) && trimmed.includes('-');
+}
+
+/**
+ * Parse a pipe-delimited table row into an HTML `<tr>`.
+ * Supports escaped pipes (`\|`) inside cell content.
+ *
+ * @param {string} line - Raw table row text.
+ * @param {string} cellTag - 'th' for header cells, 'td' for body cells.
+ *
+ * @returns {string} HTML string for the table row.
+ */
+function buildTableRow(line, cellTag) {
+    const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+    // Split on unescaped pipes, then restore escaped ones
+    const cells = trimmed.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
+    const cellsHtml = cells.map((c) => `<${cellTag}>${inlineFormat(c)}</${cellTag}>`).join('');
+    return `<tr>${cellsHtml}</tr>`;
 }
 
 /**

@@ -33,6 +33,7 @@ export default {
     ai: {
         enabled: false,
         provider: 'ollama',
+        promptTemplateMode: 'properties',
         promptTemplate: 'general',
         systemPrompt: '',
         ollama: {

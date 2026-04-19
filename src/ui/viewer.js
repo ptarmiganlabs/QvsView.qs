@@ -660,13 +660,22 @@ export function renderPlaceholder(element, message = 'Add a dimension containing
  * @returns {void}
  */
 export function renderWarning(element, message, identifiers) {
-    const listItems = (identifiers || []).map((id) => `<li>${escapeHTML(id)}</li>`).join('');
+    const ids = identifiers || [];
+    const MAX_SHOWN = 5;
+    const shown = ids.slice(0, MAX_SHOWN);
+    const remaining = ids.length - shown.length;
+
+    const listItems = shown.map((id) => `<li>${escapeHTML(id)}</li>`).join('');
+    const moreText =
+        remaining > 0
+            ? `<li class="${CSS_PREFIX}-warning-more">…and ${remaining} more script${remaining === 1 ? '' : 's'} selected</li>`
+            : '';
 
     element.innerHTML = `
         <div class="${CSS_PREFIX}-warning">
             <div class="${CSS_PREFIX}-warning-icon">&#9888;</div>
             <div class="${CSS_PREFIX}-warning-text">${escapeHTML(message)}</div>
-            <ul class="${CSS_PREFIX}-warning-list">${listItems}</ul>
+            <ul class="${CSS_PREFIX}-warning-list">${listItems}${moreText}</ul>
         </div>
     `;
 }

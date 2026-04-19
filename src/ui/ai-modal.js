@@ -11,6 +11,14 @@ import { initMermaidDiagrams } from '../ai/mermaid-init.js';
 
 const CSS_PREFIX = 'qvs';
 
+/** Human-readable labels and icons for each prompt template key. */
+const TEMPLATE_LABELS = {
+    general: { label: 'General analysis', icon: '📊' },
+    security: { label: 'Security audit', icon: '🔒' },
+    performance: { label: 'Performance review', icon: '⚡' },
+    documentation: { label: 'Documentation', icon: '📝' },
+};
+
 /**
  * Remove trailing conversational filler that LLMs often append
  * (e.g. "Let me know if…", "Feel free to…", "Happy to help…").
@@ -96,13 +104,15 @@ const LOADING_MESSAGES = [
  *
  * @param {object} opts - Modal options.
  * @param {HTMLElement} opts.container - Parent element to attach the modal to.
- * @param {(opts: {bypassCache: boolean, scope: string}) => Promise<{content: string, model: string, provider: string}>} opts.onAnalyze - Async function that performs the analysis.
+ * @param {(opts: {bypassCache: boolean, scope: string, promptTemplate?: string}) => Promise<{content: string, model: string, provider: string}>} opts.onAnalyze - Async function that performs the analysis.
  * @param {(() => void)} [opts.onClose] - Callback when the modal is closed.
  * @param {number} [opts.quoteCycleSeconds] - Seconds between loading quote changes (3–10).
  * @param {number} opts.sectionCount - Number of script sections/tabs.
  * @param {string} opts.activeSectionName - Name of the currently active section/tab.
+ * @param {string} [opts.promptTemplateMode] - 'properties' (default) or 'runtime'.
+ * @param {string} [opts.fixedPromptTemplate] - Template key when mode is 'properties'.
  *
- * @returns {{ close: () => void, showLoading: () => void, showError: (msg: string) => void, showResult: (content: string, meta: object) => Promise<void>, promptApiKey: (provider: string) => Promise<string|null>, runAnalysis: (bypassCache?: boolean) => Promise<void> }} Controller object.
+ * @returns {{ close: () => void, showLoading: (templateKey?: string) => void, showError: (msg: string) => void, showResult: (content: string, meta: object) => Promise<void>, promptApiKey: (provider: string) => Promise<string|null>, runAnalysis: (bypassCache?: boolean) => Promise<void> }} Controller object.
  */
 export function showAiModal({
     container,
@@ -111,6 +121,8 @@ export function showAiModal({
     quoteCycleSeconds = 5,
     sectionCount = 1,
     activeSectionName = 'Main',
+    promptTemplateMode = 'properties',
+    fixedPromptTemplate = 'general',
 }) {
     const cycleMs = Math.max(3, Math.min(10, quoteCycleSeconds)) * 1000;
     // ── Backdrop + Dialog ──
@@ -160,9 +172,22 @@ export function showAiModal({
     let loadingTimers = { message: null, elapsed: null };
     let snakeCleanup = null;
 
+    /**
+     * Registry of pending picker resolvers — resolved with null when the modal closes,
+     * so awaiting callers (scope picker, template picker) do not hang forever.
+     *
+     * @type {Set<(value: null) => void>}
+     */
+    const pendingResolvers = new Set();
+
     // ── Close handler ──
     /** Remove the modal from the DOM and clean up all listeners and timers. */
     function close() {
+        // Cancel any pending scope / template pickers
+        for (const resolve of pendingResolvers) {
+            resolve(null);
+        }
+        pendingResolvers.clear();
         document.removeEventListener('keydown', handleKeydown);
         backdrop.removeEventListener('click', handleBackdropClick);
         clearLoadingTimers();
@@ -235,8 +260,12 @@ export function showAiModal({
         return `${m}m ${s}s`;
     }
 
-    /** Display the loading state with cycling messages, elapsed timer, and Snake game button. */
-    function showLoading() {
+    /**
+     * Display the loading state with cycling messages, elapsed timer, and Snake game button.
+     *
+     * @param {string} [templateKey] - Active prompt template key to display as a badge.
+     */
+    function showLoading(templateKey) {
         clearLoadingTimers();
         if (snakeCleanup) {
             snakeCleanup();
@@ -248,9 +277,16 @@ export function showAiModal({
         let msgIndex = Math.floor(Math.random() * LOADING_MESSAGES.length);
         const first = LOADING_MESSAGES[msgIndex];
 
+        // Template badge HTML
+        const tmpl = templateKey && TEMPLATE_LABELS[templateKey];
+        const badgeHTML = tmpl
+            ? `<p class="${CSS_PREFIX}-ai-template-badge">${tmpl.icon} ${escapeHtml(tmpl.label)}</p>`
+            : '';
+
         body.innerHTML = `
             <div class="${CSS_PREFIX}-ai-loading">
                 <div class="${CSS_PREFIX}-ai-spinner"></div>
+                ${badgeHTML}
                 <p class="${CSS_PREFIX}-ai-loading-msg">${first.icon} ${first.text}</p>
                 <p class="${CSS_PREFIX}-ai-loading-elapsed">0s</p>
                 <button class="${CSS_PREFIX}-ai-btn ${CSS_PREFIX}-ai-snake-btn">🐍 Play Snake while you wait?</button>
@@ -325,7 +361,7 @@ export function showAiModal({
      * Render the analysis result in the modal body.
      *
      * @param {string} content - Markdown content from the AI provider.
-     * @param {{ model: string, provider: string }} meta - Provider metadata.
+     * @param {{ model: string, provider: string, templateKey?: string }} meta - Provider metadata.
      */
     async function showResult(content, meta) {
         clearLoadingTimers();
@@ -341,6 +377,10 @@ export function showAiModal({
         const html = renderMarkdown(rawContent);
         const metaParts = [];
         if (meta) {
+            const tmpl = meta.templateKey && TEMPLATE_LABELS[meta.templateKey];
+            if (tmpl) {
+                metaParts.push(`${tmpl.icon} ${escapeHtml(tmpl.label)}`);
+            }
             metaParts.push(`Model: ${escapeHtml(meta.model)}`);
             metaParts.push(`Provider: ${escapeHtml(meta.provider)}`);
         }
@@ -410,6 +450,7 @@ export function showAiModal({
      */
     function promptScope() {
         return new Promise((resolve) => {
+            pendingResolvers.add(resolve);
             const safeName = escapeHtml(activeSectionName);
             body.innerHTML = `
                 <div class="${CSS_PREFIX}-ai-scope-prompt">
@@ -432,7 +473,59 @@ export function showAiModal({
 
             body.querySelectorAll(`.${CSS_PREFIX}-ai-scope-btn`).forEach((btn) => {
                 btn.addEventListener('click', () => {
+                    pendingResolvers.delete(resolve);
                     resolve(btn.dataset.scope);
+                });
+            });
+        });
+    }
+
+    // ── Template picker (shown at runtime when promptTemplateMode === 'runtime') ──
+
+    /** @type {string} Last chosen runtime template — remembered across re-analyze clicks */
+    let lastTemplate = '';
+
+    /**
+     * Show an inline prompt template picker.
+     *
+     * @returns {Promise<string|null>} Template key, or null if cancelled.
+     */
+    function promptTemplateChoice() {
+        return new Promise((resolve) => {
+            pendingResolvers.add(resolve);
+            body.innerHTML = `
+                <div class="${CSS_PREFIX}-ai-scope-prompt">
+                    <p class="${CSS_PREFIX}-ai-scope-title">Choose analysis type</p>
+                    <div class="${CSS_PREFIX}-ai-scope-options ${CSS_PREFIX}-ai-template-grid">
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="general">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">📊</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">General analysis</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Overview, flow, data model & improvements</span>
+                        </button>
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="security">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">🔒</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">Security audit</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Vulnerabilities, risks & remediation</span>
+                        </button>
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="performance">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">⚡</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">Performance review</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Bottlenecks & optimization opportunities</span>
+                        </button>
+                        <button class="${CSS_PREFIX}-ai-scope-btn" data-template="documentation">
+                            <span class="${CSS_PREFIX}-ai-scope-icon">📝</span>
+                            <span class="${CSS_PREFIX}-ai-scope-label">Documentation</span>
+                            <span class="${CSS_PREFIX}-ai-scope-desc">Generate comprehensive script docs</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            footer.style.display = 'none';
+
+            body.querySelectorAll(`.${CSS_PREFIX}-ai-scope-btn`).forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    pendingResolvers.delete(resolve);
+                    resolve(btn.dataset.template);
                 });
             });
         });
@@ -442,6 +535,7 @@ export function showAiModal({
     /**
      * Execute the analysis and render results.
      * Prompts for scope if there are multiple script tabs.
+     * Prompts for template if promptTemplateMode is 'runtime'.
      *
      * @param {boolean} [bypassCache] - Whether to bypass the cache.
      */
@@ -455,10 +549,29 @@ export function showAiModal({
         }
         if (!scope) scope = 'full';
 
-        showLoading();
+        // Determine template — prompt if runtime mode and (re-analyze or no previous choice)
+        let template = lastTemplate;
+        if (promptTemplateMode === 'runtime' && (bypassCache || !template)) {
+            template = await promptTemplateChoice();
+            if (!template) return; // dialog was closed before choosing
+            lastTemplate = template;
+        }
+
+        // Effective template key for display (runtime pick or fixed from properties)
+        const effectiveTemplate = template || fixedPromptTemplate;
+
+        showLoading(effectiveTemplate);
         try {
-            const result = await onAnalyze({ bypassCache, scope });
-            await showResult(result.content, { model: result.model, provider: result.provider });
+            const result = await onAnalyze({
+                bypassCache,
+                scope,
+                promptTemplate: template || undefined,
+            });
+            await showResult(result.content, {
+                model: result.model,
+                provider: result.provider,
+                templateKey: effectiveTemplate,
+            });
         } catch (err) {
             showError(err.message || 'Analysis failed');
         }

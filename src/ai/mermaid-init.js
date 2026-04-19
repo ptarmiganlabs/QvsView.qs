@@ -72,7 +72,77 @@ function sanitizeMermaidSource(src) {
             .join('\n');
     }
 
+    // Sanitize erDiagram blocks: attribute names cannot contain dots or hyphens.
+    // LLMs commonly produce field names like "events.venue.country_GeoInfo" from
+    // Qlik data models. Replace dots/hyphens with underscores in attribute lines.
+    if (/^\s*erDiagram\b/m.test(code)) {
+        code = sanitizeErDiagram(code);
+    }
+
     return code;
+}
+
+/**
+ * Sanitize erDiagram attribute names that contain characters invalid in Mermaid.
+ *
+ * Mermaid erDiagram attribute names must be simple identifiers — dots, hyphens,
+ * and other special characters cause parse errors. This replaces them with
+ * underscores. Entity names with dots are also sanitized. Relationship lines
+ * and other structural syntax are left untouched.
+ *
+ * @param {string} code - Raw erDiagram Mermaid source.
+ *
+ * @returns {string} Sanitized erDiagram source.
+ */
+function sanitizeErDiagram(code) {
+    // Track entity name replacements so relationship lines stay consistent
+    const entityRenames = new Map();
+
+    return code
+        .split('\n')
+        .map((line) => {
+            // Skip the erDiagram keyword line
+            if (/^\s*erDiagram\b/.test(line)) return line;
+            // Skip comments
+            if (/^\s*%%/.test(line)) return line;
+            // Skip empty lines and closing braces
+            if (/^\s*$/.test(line) || /^\s*}\s*$/.test(line)) return line;
+
+            // Entity opening: "  entityName {"
+            const entityMatch = line.match(/^(\s*)([\w.|-]+)(\s*\{)\s*$/);
+            if (entityMatch) {
+                const [, indent, name, brace] = entityMatch;
+                const safe = name.replace(/[.|-]+/g, '_');
+                if (safe !== name) entityRenames.set(name, safe);
+                return `${indent}${safe}${brace}`;
+            }
+
+            // Attribute line: "    type name" or "    type name PK/FK"
+            // Must not match relationship lines (which contain ||, --, {, })
+            const attrMatch = line.match(/^(\s+)([\w.|-]+)(\s+)([\w.|-]+)(.*?)$/);
+            if (attrMatch && !/[|{}]/.test(line)) {
+                const [, indent, type, space, attrName, rest] = attrMatch;
+                const safeType = type.replace(/[.|-]+/g, '_');
+                const safeName = attrName.replace(/[.|-]+/g, '_');
+                return `${indent}${safeType}${space}${safeName}${rest}`;
+            }
+
+            // Relationship line: "  entity1 ||--o{ entity2 : "label""
+            // Replace any entity names that were renamed above, using word boundaries
+            // to avoid rewriting substrings inside longer identifiers.
+            let result = line;
+            for (const [original, safe] of entityRenames) {
+                result = result.replace(
+                    new RegExp(
+                        `(?<![\\w])${original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`,
+                        'g'
+                    ),
+                    safe
+                );
+            }
+            return result;
+        })
+        .join('\n');
 }
 
 /**
