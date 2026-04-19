@@ -59,7 +59,7 @@
         "@rollup/plugin-replace": "^6.0.2",
         "archiver": "^7.0.1",
         "cross-env": "^10.1.0",
-        "eslint": "^10.2.0",
+        "eslint": "^10.2.1",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-jsdoc": "^62.9.0",
         "globals": "^17.4.0",
@@ -67,7 +67,7 @@
         "lint-staged": "^16.4.0",
         "md-to-pdf": "^5.2.5",
         "mermaid": "^11.14.0",
-        "prettier": "^3.8.1"
+        "prettier": "^3.8.3"
     },
     "peerDependencies": {
         "@nebula.js/stardust": ">=5.0.0"
