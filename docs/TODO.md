@@ -23,7 +23,7 @@
 - [x] Section navigation / tab switcher
 - [x] Text selection and right-click context menu support in the viewer
 - [x] Search within script (Ctrl/Cmd+F)
-- [ ] Collapsible code blocks / folding
+- [x] Collapsible code blocks / folding
 
 ## Phase 4: BNF Parser Integration
 
