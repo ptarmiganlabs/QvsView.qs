@@ -55,10 +55,10 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 
 Each release includes two variants of the extension:
 
-| Release file                       | Description                                                                          | When to use                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------- |
-| `qvsview-qs-v{VERSION}-cdn.zip`    | **CDN variant** — Mermaid.js loaded from jsDelivr at runtime. Small bundle (~40 KB). | Environments with internet access             |
-| `qvsview-qs-v{VERSION}-airgap.zip` | **Air-gapped variant** — Mermaid.js bundled in the extension. Larger bundle (~3 MB). | Air-gapped or network-restricted environments |
+| Release file                       | Description                                                                            | When to use                                   |
+| ---------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `qvsview-qs-v{VERSION}-cdn.zip`    | **CDN variant** — Mermaid.js loaded from jsDelivr at runtime. Small bundle (~57 KB).   | Environments with internet access             |
+| `qvsview-qs-v{VERSION}-airgap.zip` | **Air-gapped variant** — Mermaid.js bundled in the extension. Larger bundle (~910 KB). | Air-gapped or network-restricted environments |
 
 1. Go to [**Releases**](https://github.com/ptarmiganlabs/QvsView.qs/releases) and download the variant that matches your environment.
 2. Extract the downloaded ZIP. Inside you will find:
