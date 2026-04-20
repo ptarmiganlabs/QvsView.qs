@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.2.0...qvsview-qs-v0.3.0) (2026-04-20)
+
+
+### Features
+
+* Add list of available Anthropic LLMs ([6724697](https://github.com/ptarmiganlabs/QvsView.qs/commit/6724697f0f09010f162d7fd5efc444e87508f860))
+* Implement OpenAI model fetching and refresh functionality ([46efa86](https://github.com/ptarmiganlabs/QvsView.qs/commit/46efa8650952e6a18054613cdd05a7c10297a202))
+* Update Anthropic model handling ([f4fa341](https://github.com/ptarmiganlabs/QvsView.qs/commit/f4fa3412ab74a81e573590cb4900d79df3c568d6))
+
+
+### Miscellaneous
+
+* Update eslint and prettier versions ([9bf78fd](https://github.com/ptarmiganlabs/QvsView.qs/commit/9bf78fd9f6688a13d9f93ee083f71838bd4cfeb1))
+
 ## [0.2.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.1.0...qvsview-qs-v0.2.0) (2026-04-19)
 
 ### Features
