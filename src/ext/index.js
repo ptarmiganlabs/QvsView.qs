@@ -43,10 +43,12 @@ export default function ext(_galaxy) {
                         dimensionsHint: {
                             component: 'text',
                             label:
-                                'Add 2 dimensions in order:\n\n' +
-                                '1 · Script text — the field where each row contains one line of Qlik script ' +
+                                'Add 3 dimensions in order:\n\n' +
+                                '1 · Row number — a field holding the load-order row number ' +
+                                '(e.g. a field populated with RecNo() or RowNo() during the data load script).\n\n' +
+                                '2 · Script text — the field where each row contains one line of Qlik script ' +
                                 '(e.g. "Script_Data").\n\n' +
-                                '2 · Script source — a field that uniquely identifies the script file or app ' +
+                                '3 · Script source — a field that uniquely identifies the script file or app ' +
                                 '(e.g. "FileName", "AppID"). Used for multi-source filtering.',
                         },
                     },

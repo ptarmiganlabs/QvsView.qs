@@ -1,32 +1,18 @@
 /**
  * Hypercube data target definition for QvsView.qs.
  *
- * The user configures exactly two dimensions:
- *   1. Script text   — field where each row is one line of Qlik script.
- *   2. Script source — field identifying the script (e.g. FileName, AppID).
+ * The user configures up to three dimensions in this order:
+ *   1. Row number    — field holding the per-row load-order number (e.g. a field
+ *                      populated with RecNo() or RowNo() during the data load).
+ *                      Sorting by this dimension numerically ascending preserves
+ *                      the original script line order.
+ *   2. Script text   — field where each row is one line of Qlik script.
+ *   3. Script source — field identifying the script (e.g. FileName, AppID).
+ *                      Used for multi-source filtering (optional).
  *
- * A third dimension, RowNo(), is automatically injected at index 0 by the
- * component at runtime. This prevents the Qlik engine from deduplicating
- * identical or empty script lines. It is fully transparent to the user.
- *
- * min: 2  — ensures the visualization is considered complete once both user
- *            dimensions are present (satisfies Qlik's "Incomplete visualization"
- *            check for legacy objects that have not yet received the RowNo dim).
- * max: 3  — allows the injected RowNo() to coexist alongside the two user dims.
+ * min: 2  — row number + script text are the minimum required dims.
+ * max: 3  — script source is optional.
  */
-
-/**
- * Check whether the first qDimensions entry is the auto-injected RowNo() dim.
- * Used by both description() and added() to resolve the correct user-dim index.
- *
- * @param {object} properties - Object properties passed to the callbacks.
- *
- * @returns {boolean} True when RowNo() occupies qDimensions[0].
- */
-function firstDimIsRowNo(properties) {
-    const firstDef = properties.qHyperCubeDef?.qDimensions?.[0]?.qDef?.qFieldDefs?.[0] ?? '';
-    return firstDef.includes('RowNo()');
-}
 
 export default {
     targets: [
@@ -38,47 +24,42 @@ export default {
                 /**
                  * Description labels shown in the property panel dimension picker.
                  *
-                 * After RowNo() injection the user dims live at indices 1 and 2;
-                 * before injection (or on legacy objects) they live at 0 and 1.
+                 * Column layout is always:
+                 *   index 0 — Row number
+                 *   index 1 — Script text
+                 *   index 2 — Script source (optional)
                  *
-                 * @param {object} properties - Object properties.
+                 * @param {object} _properties - Object properties (unused).
                  * @param {number} index - Dimension index (0-based) in qDimensions.
                  *
                  * @returns {string} The label text.
                  */
-                description(properties, index) {
-                    const hasRowNo = firstDimIsRowNo(properties);
-                    if (hasRowNo) {
-                        // Post-injection layout: user dims are at indices 1 and 2
-                        if (index === 1)
-                            return 'Dim 1 · Script text — field where each row is one line of Qlik script (e.g. "Script_Data")';
-                        if (index === 2)
-                            return 'Dim 2 · Script source — field identifying the script file or app (e.g. "FileName", "AppID")';
-                        return ''; // index 0 = RowNo(), not user-visible
-                    }
-                    // Pre-injection or legacy layout: user dims are at indices 0 and 1
+                description(_properties, index) {
                     if (index === 0)
-                        return 'Dim 1 · Script text — field where each row is one line of Qlik script (e.g. "Script_Data")';
+                        return 'Dim 1 · Row number — field holding the load-order row number (e.g. a field set to RecNo() during load)';
                     if (index === 1)
-                        return 'Dim 2 · Script source — field identifying the script file or app (e.g. "FileName", "AppID")';
+                        return 'Dim 2 · Script text — field where each row is one line of Qlik script (e.g. "Script_Data")';
+                    if (index === 2)
+                        return 'Dim 3 · Script source — field identifying the script file or app (e.g. "FileName", "AppID")';
                     return '';
                 },
                 /**
                  * Called when a dimension is added by the user.
-                 * Forces sort by load order on the script text dimension so lines
-                 * stay in their original sequence.
+                 * Applies numeric-ascending sort to the row number dimension so
+                 * the engine returns lines in load order by default.
                  *
                  * @param {object} dimension - The NxDimension being added.
-                 * @param {object} properties - Object properties.
+                 * @param {object} _properties - Object properties (unused).
                  * @param {number} index - Dimension index (0-based) in qDimensions.
                  */
-                added(dimension, properties, index) {
-                    // Script text is at index 1 after injection, index 0 before
-                    const textIndex = firstDimIsRowNo(properties) ? 1 : 0;
-                    if (index === textIndex) {
+                added(dimension, _properties, index) {
+                    if (index === 0) {
+                        // Row number field must be numeric for correct sort order.
+                        // Fields created with RecNo() or RowNo() during the load script
+                        // satisfy this requirement automatically.
                         dimension.qDef.qSortCriterias = [
                             {
-                                qSortByLoadOrder: 1,
+                                qSortByNumeric: 1,
                                 qSortByAscii: 0,
                             },
                         ];

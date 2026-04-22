@@ -5,9 +5,10 @@
  * dropped onto a sheet. Includes the hypercube definition and
  * viewer display settings.
  *
- * The user adds two dimensions (script text + script source).
- * A RowNo() dimension is automatically injected at index 0 by the component
- * at runtime to prevent the engine from deduplicating identical script lines.
+ * The user adds three dimensions:
+ *   1. Row number  — load-order row number field (e.g. a field set to RecNo() during load)
+ *   2. Script text — field where each row is one line of Qlik script
+ *   3. Script source — field identifying the script file or app (optional)
  */
 export default {
     showTitles: true,
@@ -17,8 +18,6 @@ export default {
     qHyperCubeDef: {
         qDimensions: [],
         qMeasures: [],
-        // qWidth: 3 anticipates the injected RowNo() column; Qlik returns fewer
-        // columns gracefully when only 2 user dims are present.
         qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],
         qSuppressZero: false,
         qSuppressMissing: false,
