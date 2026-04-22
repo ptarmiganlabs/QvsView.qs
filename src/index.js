@@ -115,6 +115,16 @@ export default function supernova(_galaxy) {
                         if (dims[0]?.qDef?.qFieldDefs?.[0]?.includes('RowNo()')) return;
 
                         logger.info('Injecting RowNo() dimension at index 0');
+
+                        // Sort the user dims first (by their load-order criteria),
+                        // then RowNo last (it only prevents deduplication).
+                        // qInterColumnSortOrder indices refer to qDimensions array
+                        // positions after injection: RowNo=0, userDim1=1, userDim2=2, …
+                        const interColumnSortOrder = [
+                            ...Array.from({ length: dims.length }, (_, i) => i + 1),
+                            0,
+                        ];
+
                         return model.setProperties({
                             ...props,
                             qHyperCubeDef: {
@@ -132,6 +142,8 @@ export default function supernova(_galaxy) {
                                     },
                                     ...dims,
                                 ],
+                                // User dims are primary sort (load order); RowNo is last
+                                qInterColumnSortOrder: interColumnSortOrder,
                                 // Widen the initial fetch to cover the new column
                                 qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],
                             },
@@ -257,6 +269,19 @@ export default function supernova(_galaxy) {
                 if (!script) {
                     renderPlaceholder(element);
                     return;
+                }
+
+                // Debug: log script to console when exactly one source is active
+                if (activeIds && activeIds.length === 1) {
+                    const lines = filteredRows.map((r) => r.text);
+                    logger.info(
+                        `[QvsView debug] Source: "${activeIds[0]}" — ${lines.length} lines`
+                    );
+                    lines.forEach((line, i) => {
+                        logger.info(
+                            `[QvsView debug] ${String(i + 1).padStart(4, ' ')}: ${JSON.stringify(line)}`
+                        );
+                    });
                 }
 
                 const viewerOpts = layout.viewer || {};
