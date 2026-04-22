@@ -132,8 +132,7 @@ Endpoints and LLM models can be customized in the property panel, allowing use o
 ### Setup
 
 1. Enable **AI Analysis** in the property panel under _AI Analysis → Enable AI Analysis_.
-2. Choose a **provider** and configure the endpoint, model, and API key mode:
-    - Select a model from **Available models** or type any compatible model name into **Model** for custom/OpenAI-compatible endpoints.
+2. Choose a **provider** and configure the endpoint, model (either choose from **Available models** or type directly into **Model**), and API key mode:
     - **Stored** — key saved in the Qlik object properties (convenient but visible to anyone with object access).
     - **Prompt at runtime** — key requested when you click Analyze and cached for the browser session.
 3. Optionally set **Analysis scope** (current section or full script) and a **Custom system prompt**.

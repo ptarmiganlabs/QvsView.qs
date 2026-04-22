@@ -525,6 +525,8 @@ export function aiSection() {
                 label: 'Available models',
                 defaultValue: 'llama3.1',
                 component: 'dropdown',
+                description:
+                    'Select a detected model to populate the Model field below, or type a custom model name there.',
                 /**
                  * Return available Ollama models as dropdown options.
                  * Fetches from the configured endpoint and caches results.
@@ -573,6 +575,8 @@ export function aiSection() {
                 type: 'string',
                 label: 'Model',
                 defaultValue: 'llama3.1',
+                description:
+                    'Enter any compatible model name. This field shares the same value as Available models above.',
                 /**
                  * Determine visibility based on current properties.
                  *
@@ -649,6 +653,8 @@ export function aiSection() {
                 label: 'Available models',
                 defaultValue: 'gpt-4o',
                 component: 'dropdown',
+                description:
+                    'Select a detected model to populate the Model field below, or type a custom model name there.',
                 /**
                  * Return available OpenAI models as dropdown options.
                  * Fetches from /v1/models using the configured API key.
@@ -713,6 +719,8 @@ export function aiSection() {
                 type: 'string',
                 label: 'Model',
                 defaultValue: 'gpt-4o',
+                description:
+                    'Enter any compatible model name. This field shares the same value as Available models above.',
                 /**
                  * Determine visibility based on current properties.
                  *
@@ -844,6 +852,8 @@ export function aiSection() {
                 label: 'Available models',
                 defaultValue: 'claude-sonnet-4-20250514',
                 component: 'dropdown',
+                description:
+                    'Select a detected model to populate the Model field below, or type a custom model name there.',
                 /**
                  * Return available Anthropic models as dropdown options.
                  * Fetches from /v1/models using the configured API key.
@@ -914,6 +924,8 @@ export function aiSection() {
                 type: 'string',
                 label: 'Model',
                 defaultValue: 'claude-sonnet-4-20250514',
+                description:
+                    'Enter any compatible model name. This field shares the same value as Available models above.',
                 /**
                  * Determine visibility based on current properties.
                  *
