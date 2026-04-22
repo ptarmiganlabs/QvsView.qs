@@ -573,7 +573,7 @@ export function aiSection() {
             ollamaModelInput: {
                 ref: 'ai.ollama.model',
                 type: 'string',
-                label: 'Model',
+                label: 'Model override',
                 defaultValue: 'llama3.1',
                 description:
                     'Enter any compatible model name. This field shares the same value as Available models above.',
@@ -717,7 +717,7 @@ export function aiSection() {
             openaiModelInput: {
                 ref: 'ai.openai.model',
                 type: 'string',
-                label: 'Model',
+                label: 'Model override',
                 defaultValue: 'gpt-4o',
                 description:
                     'Enter any compatible model name. This field shares the same value as Available models above.',
@@ -922,7 +922,7 @@ export function aiSection() {
             anthropicModelInput: {
                 ref: 'ai.anthropic.model',
                 type: 'string',
-                label: 'Model',
+                label: 'Model override',
                 defaultValue: 'claude-sonnet-4-20250514',
                 description:
                     'Enter any compatible model name. This field shares the same value as Available models above.',
