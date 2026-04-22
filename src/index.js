@@ -168,13 +168,13 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // rawRows === null  → data fetch still in-flight (show loading state)
-                // rawRows is empty array → fetch completed but returned nothing
-                if (rawRows === null) {
+                // rawRows === undefined → data fetch still in-flight (show loading state)
+                // rawRows === null or [] → fetch completed but returned nothing usable
+                if (typeof rawRows === 'undefined') {
                     renderLoading(element);
                     return;
                 }
-                if (rawRows.length === 0) {
+                if (!Array.isArray(rawRows) || rawRows.length === 0) {
                     renderPlaceholder(element);
                     return;
                 }
