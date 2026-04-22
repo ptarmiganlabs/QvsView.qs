@@ -1,0 +1,565 @@
+///$tab Init
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;-$#,##0.00';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='M/D/YYYY';
+SET TimestampFormat='M/D/YYYY h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='en-US';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET LongMonthNames='January;February;March;April;May;June;July;August;September;October;November;December';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
+
+///$tab Healthcheck
+Sub Healthcheck(healthcheckId)
+    LIB CONNECT TO 'Healthcheck';
+
+    let remoteURL = 'http://healthcheck.ptarmiganlabs.net:8000/ping/$(healthcheckId)';
+
+    RestConnectorMasterTable:
+    SQL SELECT 
+        "col_1"
+    FROM CSV (header off, delimiter ",", quote """") "CSV_source"
+    WITH CONNECTION(Url "$(remoteURL)");
+    ;
+
+    // Uncomment if you are interested in the result that came back from the healthcheck service
+    //   [CSV_source]:
+    //   LOAD	
+    //   	[col_1]
+    //   RESIDENT RestConnectorMasterTable;
+
+    DROP TABLE RestConnectorMasterTable;
+End Sub
+
+
+
+Sub HealthcheckStart(healthcheckId)
+    LIB CONNECT TO 'Healthcheck';
+
+    let remoteURL = 'http://healthcheck.ptarmiganlabs.net:8000/ping/$(healthcheckId)/start';
+
+    RestConnectorMasterTable:
+    SQL SELECT 
+        "col_1"
+    FROM CSV (header off, delimiter ",", quote """") "CSV_source"
+    WITH CONNECTION(Url "$(remoteURL)");
+    ;
+
+    // Uncomment if you are interested in the result that came back from the healthcheck service
+    //   [CSV_source]:
+    //   LOAD	
+    //   	[col_1]
+    //   RESIDENT RestConnectorMasterTable;
+
+    DROP TABLE RestConnectorMasterTable;
+End Sub
+
+
+///$tab Signal job start
+let vHealthcheckUUID = '10a887bf-4580-4891-9c6f-2affbd380f16';
+
+call HealthcheckStart('$(vHealthcheckUUID)')
+
+///$tab Load data
+Set dataManagerTables = '','events','venues','cities','groups','categories','members','topics','groups_topics';
+//This block renames script tables from non generated section which conflict with the names of managed tables
+
+For each name in $(dataManagerTables) 
+    Let index = 0;
+    Let currentName = name; 
+    Let tableNumber = TableNumber(name); 
+    Let matches = 0; 
+    Do while not IsNull(tableNumber) or (index > 0 and matches > 0)
+        index = index + 1; 
+        currentName = name & '-' & index; 
+        tableNumber = TableNumber(currentName) 
+        matches = Match('$(currentName)', $(dataManagerTables));
+    Loop 
+    If index > 0 then 
+            Rename Table '$(name)' to '$(currentName)'; 
+    EndIf; 
+Next; 
+Set dataManagerTables = ;
+
+
+Unqualify *;
+
+__countryAliasesBase:
+LOAD
+	Alias AS [__Country],
+	ISO3Code AS [__ISO3Code]
+FROM [lib://AttachedFiles/countryAliases.qvd]
+(qvd);
+
+__countryGeoBase:
+LOAD
+	ISO3Code AS [__ISO3Code],
+	ISO2Code AS [__ISO2Code],
+	Polygon AS [__Polygon]
+FROM [lib://AttachedFiles/countryGeo.qvd]
+(qvd);
+
+__cityAliasesBase:
+LOAD
+	Alias AS [__City],
+	geoKey AS [__geoKey],
+	CountryCode AS [__CityCountryCode]
+FROM [lib://AttachedFiles/cityAliases.qvd]
+(qvd);
+
+__cityGeoBase:
+LOAD
+	geoKey AS [__geoKey],
+	geoPoint AS [__GeoPoint]
+FROM [lib://AttachedFiles/cityGeo.qvd]
+(qvd);
+
+__countryName2IsoThree:
+MAPPING LOAD
+	__Country,
+	__ISO3Code
+RESIDENT __countryAliasesBase;
+
+__countryCodeIsoThree2Polygon:
+MAPPING LOAD
+	__ISO3Code,
+	__Polygon
+RESIDENT __countryGeoBase;
+
+__countryCodeAndCityName2Key:
+MAPPING LOAD
+	__CityCountryCode & __City,
+	__geoKey
+RESIDENT __cityAliasesBase;
+
+__cityKey2GeoPoint:
+MAPPING LOAD
+	__geoKey,
+	__GeoPoint
+RESIDENT __cityGeoBase;
+
+[events]:
+LOAD
+	[event_id],
+	[created],
+	[description],
+	[duration],
+	[event_url],
+	[fee.accepts],
+	[fee.amount],
+	[fee.currency],
+	[fee.description],
+	[fee.label],
+	[fee.required],
+	[group.created],
+	[group.group_lat],
+	[group.group_lon],
+	[group_id],
+	[group.join_mode],
+	[group.name],
+	[group.urlname],
+	[group.who],
+	[headcount],
+	[how_to_find_us],
+	[maybe_rsvp_count],
+	[event_name],
+	[photo_url],
+	[rating.average],
+	[rating.count],
+	[rsvp_limit],
+	[event_status],
+	[event_time],
+	[updated],
+	[utc_offset] AS [events.utc_offset],
+	[venue.address_1],
+	[venue.address_2],
+	[venue.city],
+	[venue.country],
+	[venue_id],
+	[venue.lat],
+	[venue.localized_country_name],
+	[venue.lon],
+	[venue.name],
+	[venue.phone],
+	[venue.repinned],
+	[venue.state],
+	[venue.zip],
+	[visibility],
+	[waitlist_count],
+	[why],
+	[yes_rsvp_count],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([venue.country])), '-') AS [events.venue.country_GeoInfo],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([venue.localized_country_name])), '-') AS [events.venue.localized_country_name_GeoInfo];
+LOAD
+	[event_id],
+	[created],
+	[description],
+	[duration],
+	[event_url],
+	[fee.accepts],
+	[fee.amount],
+	[fee.currency],
+	[fee.description],
+	[fee.label],
+	[fee.required],
+	[group.created],
+	[group.group_lat],
+	[group.group_lon],
+	[group_id],
+	[group.join_mode],
+	[group.name],
+	[group.urlname],
+	[group.who],
+	[headcount],
+	[how_to_find_us],
+	[maybe_rsvp_count],
+	[event_name],
+	[photo_url],
+	[rating.average],
+	[rating.count],
+	[rsvp_limit],
+	[event_status],
+	[event_time],
+	[updated],
+	[utc_offset],
+	[venue.address_1],
+	[venue.address_2],
+	[venue.city],
+	[venue.country],
+	[venue_id],
+	[venue.lat],
+	[venue.localized_country_name],
+	[venue.lon],
+	[venue.name],
+	[venue.phone],
+	[venue.repinned],
+	[venue.state],
+	[venue.zip],
+	[visibility],
+	[waitlist_count],
+	[why],
+	[yes_rsvp_count]
+ FROM [lib://Test data/meetupcom\events.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+[countryMapping]:
+MAPPING LOAD * INLINE
+[
+countryMapping-FROM,countryMapping-TO
+us,US
+];
+[stateMapping]:
+MAPPING LOAD * INLINE
+[
+stateMapping-FROM,stateMapping-TO
+Ka,KA
+Ca,KA
+Il,KA
+Ne,KA
+];
+[venues]:
+LOAD
+	[venue_id],
+	[address_1],
+	[city] AS [venues.city],
+	APPLYMAP( 'countryMapping', [country]) AS [country],
+	[distance],
+	[lat],
+	[localized_country_name],
+	[lon],
+	[venue_name],
+	[rating],
+	[rating_count],
+	APPLYMAP( 'stateMapping', [state]) AS [state],
+	[zip],
+	[normalised_rating],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER(APPLYMAP( 'countryMapping', [country]))), '-') AS [venues.country_GeoInfo],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([localized_country_name])), '-') AS [venues.localized_country_name_GeoInfo],
+	GeoMakePoint([lat], [lon]) AS [venue_location],
+	APPLYMAP( '__cityKey2GeoPoint', APPLYMAP( '__countryCodeAndCityName2Key', APPLYMAP( '__countryName2IsoThree', LOWER([country])) & LOWER([venue_name])), '-') AS [venues.venue_name_GeoInfo];
+LOAD
+	[venue_id],
+	[address_1],
+	[city],
+	[country],
+	[distance],
+	[lat],
+	[localized_country_name],
+	[lon],
+	[venue_name],
+	[rating],
+	[rating_count],
+	[state],
+	[zip],
+	[normalised_rating]
+ FROM [lib://Test data/meetupcom\venues.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+[cities]:
+LOAD
+	[city] AS [cities.city],
+	[city_id],
+	[country] AS [cities.country],
+	[distance] AS [cities.distance],
+	[latitude],
+	[localized_country_name] AS [cities.localized_country_name],
+	[longitude],
+	[member_count],
+	[ranking],
+	[state] AS [cities.state],
+	[zip] AS [cities.zip],
+	APPLYMAP( '__cityKey2GeoPoint', APPLYMAP( '__countryCodeAndCityName2Key', APPLYMAP( '__countryName2IsoThree', LOWER([country])) & LOWER([city])), '-') AS [cities.cities.city_GeoInfo],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([country])), '-') AS [cities.cities.country_GeoInfo],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([localized_country_name])), '-') AS [cities.cities.localized_country_name_GeoInfo],
+	GeoMakePoint([latitude], [longitude]) AS [longitude_latitude];
+LOAD
+	[city],
+	[city_id],
+	[country],
+	[distance],
+	[latitude],
+	[localized_country_name],
+	[longitude],
+	[member_count],
+	[ranking],
+	[state],
+	[zip]
+ FROM [lib://Test data/meetupcom\cities.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+[groups]:
+LOAD
+	[group_id],
+	[category_id],
+	[category.name],
+	[category.shortname],
+	[city_id],
+	[city] AS [groups.city],
+	[country] AS [groups.country],
+	[created] AS [groups.created],
+	[description] AS [groups.description],
+	[group_photo.base_url],
+	[group_photo.highres_link],
+	[group_photo.photo_id],
+	[group_photo.photo_link],
+	[group_photo.thumb_link],
+	[group_photo.type],
+	[join_mode],
+	[lat] AS [groups.lat],
+	[link],
+	[lon] AS [groups.lon],
+	[members],
+	[group_name],
+	[organizer.member_id],
+	[organizer.name],
+	[organizer.photo.base_url],
+	[organizer.photo.highres_link],
+	[organizer.photo.photo_id],
+	[organizer.photo.photo_link],
+	[organizer.photo.thumb_link],
+	[organizer.photo.type],
+	[rating] AS [groups.rating],
+	[state] AS [groups.state],
+	[timezone],
+	[urlname],
+	[utc_offset] AS [groups.utc_offset],
+	[visibility] AS [groups.visibility],
+	[who],
+	APPLYMAP( '__cityKey2GeoPoint', APPLYMAP( '__countryCodeAndCityName2Key', APPLYMAP( '__countryName2IsoThree', LOWER([country])) & LOWER([city])), '-') AS [groups.groups.city_GeoInfo],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([country])), '-') AS [groups.groups.country_GeoInfo];
+LOAD
+	[group_id],
+	[category_id],
+	[category.name],
+	[category.shortname],
+	[city_id],
+	[city],
+	[country],
+	[created],
+	[description],
+	[group_photo.base_url],
+	[group_photo.highres_link],
+	[group_photo.photo_id],
+	[group_photo.photo_link],
+	[group_photo.thumb_link],
+	[group_photo.type],
+	[join_mode],
+	[lat],
+	[link],
+	[lon],
+	[members],
+	[group_name],
+	[organizer.member_id],
+	[organizer.name],
+	[organizer.photo.base_url],
+	[organizer.photo.highres_link],
+	[organizer.photo.photo_id],
+	[organizer.photo.photo_link],
+	[organizer.photo.thumb_link],
+	[organizer.photo.type],
+	[rating],
+	[state],
+	[timezone],
+	[urlname],
+	[utc_offset],
+	[visibility],
+	[who]
+ FROM [lib://Test data/meetupcom\groups.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+[categories]:
+LOAD
+	[category_id],
+	[category_name],
+	[shortname],
+	[sort_name]
+ FROM [lib://Test data/meetupcom\categories.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+[members]:
+LOAD
+	[member_id],
+	[bio],
+	[city],
+	[country] AS [members.country],
+	[hometown],
+	[joined],
+	[lat] AS [members.lat],
+	[link] AS [members.link],
+	[lon] AS [members.lon],
+	[member_name],
+	[state] AS [members.state],
+	[member_status],
+	[visited],
+	[group_id],
+	APPLYMAP( '__cityKey2GeoPoint', APPLYMAP( '__countryCodeAndCityName2Key', APPLYMAP( '__countryName2IsoThree', LOWER([country])) & LOWER([city])), '-') AS [members.city_GeoInfo],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([country])), '-') AS [members.members.country_GeoInfo];
+LOAD
+	[member_id],
+	[bio],
+	[city],
+	[country],
+	[hometown],
+	[joined],
+	[lat],
+	[link],
+	[lon],
+	[member_name],
+	[state],
+	[member_status],
+	[visited],
+	[group_id]
+ FROM [lib://Test data/meetupcom\members.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+[topics]:
+LOAD
+	[topic_id],
+	[description] AS [topics.description],
+	[link] AS [topics.link],
+	[members] AS [topics.members],
+	[topic_name],
+	[urlkey],
+	[main_topic_id];
+LOAD
+	[topic_id],
+	[description],
+	[link],
+	[members],
+	[topic_name],
+	[urlkey],
+	[main_topic_id]
+ FROM [lib://Test data/meetupcom\topics.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+[groups_topics]:
+LOAD
+	[topic_id],
+	[topic_key],
+	[topic_name] AS [groups_topics.topic_name],
+	[group_id];
+LOAD
+	[topic_id],
+	[topic_key],
+	[topic_name],
+	[group_id]
+ FROM [lib://Test data/meetupcom\groups_topics.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+
+
+TAG FIELD [venue.country] WITH '$geoname', '$relates_events.venue.country_GeoInfo';
+TAG FIELD [events.venue.country_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_venue.country';
+TAG FIELD [venue.localized_country_name] WITH '$geoname', '$relates_events.venue.localized_country_name_GeoInfo';
+TAG FIELD [events.venue.localized_country_name_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_venue.localized_country_name';
+
+TAG FIELD [country] WITH '$geoname', '$relates_venues.country_GeoInfo';
+TAG FIELD [venues.country_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_country';
+TAG FIELD [localized_country_name] WITH '$geoname', '$relates_venues.localized_country_name_GeoInfo';
+TAG FIELD [venues.localized_country_name_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_localized_country_name';
+TAG FIELD [venue_name] WITH '$geoname', '$relates_venues.venue_name_GeoInfo';
+TAG FIELD [venues.venue_name_GeoInfo] WITH '$geopoint', '$hidden', '$relates_venue_name';
+
+TAG FIELD [cities.city] WITH '$geoname', '$relates_cities.cities.city_GeoInfo';
+TAG FIELD [cities.cities.city_GeoInfo] WITH '$geopoint', '$hidden', '$relates_cities.city';
+TAG FIELD [cities.country] WITH '$geoname', '$relates_cities.cities.country_GeoInfo';
+TAG FIELD [cities.cities.country_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_cities.country';
+TAG FIELD [cities.localized_country_name] WITH '$geoname', '$relates_cities.cities.localized_country_name_GeoInfo';
+TAG FIELD [cities.cities.localized_country_name_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_cities.localized_country_name';
+
+TAG FIELD [groups.city] WITH '$geoname', '$relates_groups.groups.city_GeoInfo';
+TAG FIELD [groups.groups.city_GeoInfo] WITH '$geopoint', '$hidden', '$relates_groups.city';
+TAG FIELD [groups.country] WITH '$geoname', '$relates_groups.groups.country_GeoInfo';
+TAG FIELD [groups.groups.country_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_groups.country';
+
+TAG FIELD [city] WITH '$geoname', '$relates_members.city_GeoInfo';
+TAG FIELD [members.city_GeoInfo] WITH '$geopoint', '$hidden', '$relates_city';
+TAG FIELD [members.country] WITH '$geoname', '$relates_members.members.country_GeoInfo';
+TAG FIELD [members.members.country_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_members.country';
+
+DROP TABLES __countryAliasesBase, __countryGeoBase, __cityAliasesBase, __cityGeoBase;
+[autoCalendar]: 
+  DECLARE FIELD DEFINITION Tagged ('$date')
+FIELDS
+  Dual(Year($1), YearStart($1)) AS [Year] Tagged ('$axis', '$year'),
+  Dual('Q'&Num(Ceil(Num(Month($1))/3)),Num(Ceil(NUM(Month($1))/3),00)) AS [Quarter] Tagged ('$quarter', '$cyclic'),
+  Dual(Year($1)&'-Q'&Num(Ceil(Num(Month($1))/3)),QuarterStart($1)) AS [YearQuarter] Tagged ('$yearquarter', '$qualified'),
+  Dual('Q'&Num(Ceil(Num(Month($1))/3)),QuarterStart($1)) AS [_YearQuarter] Tagged ('$yearquarter', '$hidden', '$simplified'),
+  Month($1) AS [Month] Tagged ('$month', '$cyclic'),
+  Dual(Year($1)&'-'&Month($1), monthstart($1)) AS [YearMonth] Tagged ('$axis', '$yearmonth', '$qualified'),
+  Dual(Month($1), monthstart($1)) AS [_YearMonth] Tagged ('$axis', '$yearmonth', '$simplified', '$hidden'),
+  Dual('W'&Num(Week($1),00), Num(Week($1),00)) AS [Week] Tagged ('$weeknumber', '$cyclic'),
+  Date(Floor($1)) AS [Date] Tagged ('$axis', '$date', '$qualified'),
+  Date(Floor($1), 'D') AS [_Date] Tagged ('$axis', '$date', '$hidden', '$simplified'),
+  If (DayNumberOfYear($1) <= DayNumberOfYear(Today()), 1, 0) AS [InYTD] ,
+  Year(Today())-Year($1) AS [YearsAgo] ,
+  If (DayNumberOfQuarter($1) <= DayNumberOfQuarter(Today()),1,0) AS [InQTD] ,
+  4*Year(Today())+Ceil(Month(Today())/3)-4*Year($1)-Ceil(Month($1)/3) AS [QuartersAgo] ,
+  Ceil(Month(Today())/3)-Ceil(Month($1)/3) AS [QuarterRelNo] ,
+  If(Day($1)<=Day(Today()),1,0) AS [InMTD] ,
+  12*Year(Today())+Month(Today())-12*Year($1)-Month($1) AS [MonthsAgo] ,
+  Month(Today())-Month($1) AS [MonthRelNo] ,
+  If(WeekDay($1)<=WeekDay(Today()),1,0) AS [InWTD] ,
+  (WeekStart(Today())-WeekStart($1))/7 AS [WeeksAgo] ,
+  Week(Today())-Week($1) AS [WeekRelNo] ;
+
+DERIVE FIELDS FROM FIELDS [created], [group.created], [event_time], [updated], [groups.created], [joined], [visited] USING [autoCalendar] ;
+///$tab Geotag
+TAG FIELDS [venue_name] WITH $geoname;
+
+
+///$tab Signal job done
+
+
+call Healthcheck('$(vHealthcheckUUID)')
+
+

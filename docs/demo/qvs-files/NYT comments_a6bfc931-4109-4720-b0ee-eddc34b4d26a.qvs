@@ -1,0 +1,121 @@
+///$tab Main
+SET ThousandSep=' ';
+SET DecimalSep=',';
+SET MoneyThousandSep=' ';
+SET MoneyDecimalSep=',';
+SET MoneyFormat='# ##0,00 kr;-# ##0,00 kr';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='YYYY-MM-DD';
+SET TimestampFormat='YYYY-MM-DD hh:mm:ss[.fff]';
+SET FirstWeekDay=0;
+SET BrokenWeeks=0;
+SET ReferenceDay=4;
+SET FirstMonthOfYear=1;
+SET CollationLocale='sv-SE';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='jan.;feb.;mars;apr.;maj;juni;juli;aug.;sep.;okt.;nov.;dec.';
+SET LongMonthNames='januari;februari;mars;april;maj;juni;juli;augusti;september;oktober;november;december';
+SET DayNames='mån;tis;ons;tors;fre;lör;sön';
+SET LongDayNames='måndag;tisdag;onsdag;torsdag;fredag;lördag;söndag';
+SET NumericalAbbreviation='3:k;6:M;9:G;12:T;15:P;18:E;21:Z;24:Y;-3:m;-6:μ;-9:n;-12:p;-15:f;-18:a;-21:z;-24:y';
+
+///$tab Section
+Articles:
+Load
+  1 as Dummy
+AutoGenerate 1;
+
+Concatenate(Articles)
+LOAD
+	articleID & '|' & articleWordCount & '|' & newDesk & '|' & printPage & '|' & sectionName & '|' & typeOfMaterial as __key,
+   
+//     abstract,
+    articleID,
+    articleWordCount,
+    byline,
+    documentType,
+    headline,
+    keywords,
+    multimedia,
+    newDesk,
+    printPage,
+    Date(Floor(pubDate))			as pubDate,
+    pubDate							as pubTS,
+    sectionName,
+    snippet,
+    source,
+    typeOfMaterial,
+    webURL
+//FROM [lib://Test data/kaggle/nyt-comments/ArticlesJan2018.csv]
+FROM [lib://Test data/kaggle/nyt-comments/Articles*.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+tmp: NoConcatenate Load * Resident Articles where Dummy <> 1;
+Drop Field Dummy from tmp;
+Drop Table Articles;
+Rename Table tmp to Articles;
+
+
+Link:
+Load
+	articleID & '|' & articleWordCount & '|' & newDesk & '|' & printPage & '|' & sectionName & '|' & typeOfMaterial
+      as __key
+Resident Articles;
+
+Drop Fields articleID, articleWordCount, newDesk, printPage, sectionName, typeOfMaterial from Articles;
+
+
+
+
+Comments:
+LOAD
+	articleID & '|' & articleWordCount & '|' & newDesk & '|' & printPage & '|' & sectionName & '|' & typeOfMaterial as __key,
+    approveDate,
+    articleID,
+    articleWordCount,
+    commentBody,
+    commentID,
+    commentSequence,
+    commentTitle,
+    commentType,
+    Date(createDate)				as createDate,
+    depth,
+    editorsSelection,
+    inReplyTo,
+    newDesk,
+    parentID,
+    parentUserDisplayName,
+    permID,
+    picURL,
+    printPage,
+    recommendations,
+    recommendedFlag,
+    replyCount,
+    reportAbuseFlag,
+    sectionName,
+    sharing,
+    status,
+    timespeople,
+    trusted,
+    typeOfMaterial,
+    updateDate,
+    userDisplayName,
+    "userID",
+    userLocation,
+    userTitle,
+    userURL
+FROM [lib://Test data/kaggle/nyt-comments/Comments*.csv]
+// FROM [lib://Test data/kaggle/nyt-comments/CommentsJan2018.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+
+Concatenate(Link)
+Load
+	articleID & '|' & articleWordCount & '|' & newDesk & '|' & printPage & '|' & sectionName & '|' & typeOfMaterial
+      as __key
+Resident Comments;
+
+
+Drop Fields articleID, articleWordCount, newDesk, printPage, sectionName, typeOfMaterial from Comments;
