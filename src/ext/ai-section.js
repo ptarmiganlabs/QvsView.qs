@@ -183,8 +183,7 @@ function refreshOllamaModels(endpoint) {
  */
 function getOpenAIModels(endpoint, apiKey) {
     const normalizedApiKey = apiKey || '';
-    const configChanged =
-        openaiModelsEndpoint !== endpoint || openaiModelsKey !== normalizedApiKey;
+    const configChanged = openaiModelsEndpoint !== endpoint || openaiModelsKey !== normalizedApiKey;
 
     if (
         openaiModelsEndpoint === endpoint &&
@@ -523,7 +522,7 @@ export function aiSection() {
             ollamaModel: {
                 ref: 'ai.ollama.model',
                 type: 'string',
-                label: 'Model',
+                label: 'Available models',
                 defaultValue: 'llama3.1',
                 component: 'dropdown',
                 /**
@@ -558,6 +557,22 @@ export function aiSection() {
                     // No models fetched yet — show current value as placeholder
                     return [{ value: current, label: current }];
                 },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return properties.ai?.enabled === true && properties.ai?.provider === 'ollama';
+                },
+            },
+            ollamaModelInput: {
+                ref: 'ai.ollama.model',
+                type: 'string',
+                label: 'Model',
+                defaultValue: 'llama3.1',
                 /**
                  * Determine visibility based on current properties.
                  *
@@ -631,7 +646,7 @@ export function aiSection() {
             openaiModel: {
                 ref: 'ai.openai.model',
                 type: 'string',
-                label: 'Model',
+                label: 'Available models',
                 defaultValue: 'gpt-4o',
                 component: 'dropdown',
                 /**
@@ -682,6 +697,22 @@ export function aiSection() {
 
                     return [{ value: current, label: current }];
                 },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return properties.ai?.enabled === true && properties.ai?.provider === 'openai';
+                },
+            },
+            openaiModelInput: {
+                ref: 'ai.openai.model',
+                type: 'string',
+                label: 'Model',
+                defaultValue: 'gpt-4o',
                 /**
                  * Determine visibility based on current properties.
                  *
@@ -810,7 +841,7 @@ export function aiSection() {
             anthropicModel: {
                 ref: 'ai.anthropic.model',
                 type: 'string',
-                label: 'Model',
+                label: 'Available models',
                 defaultValue: 'claude-sonnet-4-20250514',
                 component: 'dropdown',
                 /**
@@ -865,6 +896,24 @@ export function aiSection() {
                     // No models yet — show current value as placeholder
                     return [{ value: current, label: current }];
                 },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return (
+                        properties.ai?.enabled === true && properties.ai?.provider === 'anthropic'
+                    );
+                },
+            },
+            anthropicModelInput: {
+                ref: 'ai.anthropic.model',
+                type: 'string',
+                label: 'Model',
+                defaultValue: 'claude-sonnet-4-20250514',
                 /**
                  * Determine visibility based on current properties.
                  *
