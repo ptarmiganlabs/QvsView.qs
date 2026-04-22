@@ -14,8 +14,8 @@ QvsView.qs includes an optional AI-powered script analysis feature that sends yo
 
 1. **Enable AI Analysis** in the property panel under _AI Analysis → Enable AI Analysis_.
 2. **Choose a provider** and configure:
-    - **Ollama**: Set the endpoint (defaults to `127.0.0.1:11434`), select a model from the dynamic dropdown, and optionally click **🔄 Refresh model list** to re-fetch available models from the endpoint.
-    - **OpenAI / Anthropic**: Set the endpoint, model, and API key mode:
+    - **Ollama**: Set the endpoint (defaults to `127.0.0.1:11434`), set the model (either choose from **Available models** or type any model name into **Model**), and optionally click **🔄 Refresh model list** to re-fetch available models from the endpoint.
+    - **OpenAI / Anthropic**: Set the endpoint, set the model (either choose from **Available models** or type a custom model name into **Model**), and configure the API key mode:
         - **Stored**: Key saved in the Qlik object properties (convenient but visible to anyone with access to the object).
         - **Prompt at runtime**: Key is requested when you click Analyze and cached in `sessionStorage` for the browser session.
 3. **Optionally configure**:
