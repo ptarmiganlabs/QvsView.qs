@@ -39,7 +39,8 @@
 - [x] Add `preview.png` — `nebula sense` warns it's missing during build
 - [x] `qInitialDataFetch` height (10,000 rows) may not cover very large scripts — pagination added via `getHyperCubeData`
 - [x] Hypercube dimension sorting was alphabetical by default — fixed with `qSortByLoadOrder: 1` in `data.js`
-- [ ] Existing objects require dimension removal + re-add for sort fix to take effect
+- [x] Hypercube deduplicates identical/empty script lines — fixed by adding a `RowNo()` dimension as index 0
+- [ ] Existing objects placed before the RowNo() dimension change (hypercube had 2 dims, now requires 3) need to be removed and re-added to the sheet to pick up the new property defaults
 - [ ] Font size dropdown values may need adjustment after user testing
 
 ## Ideas
