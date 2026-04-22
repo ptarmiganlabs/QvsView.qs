@@ -222,6 +222,22 @@
     font-size: 14px;
 }
 
+/* ── Loading state (data fetch in-flight) ── */
+@keyframes qvs-pulse {
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 0.9;
+    }
+}
+
+.qvs-loading .qvs-placeholder-icon,
+.qvs-loading .qvs-placeholder-text {
+    animation: qvs-pulse 1.4s ease-in-out infinite;
+}
+
 /* ── Multi-app warning ── */
 .qvs-warning {
     display: flex;
