@@ -5,10 +5,9 @@
  * dropped onto a sheet. Includes the hypercube definition and
  * viewer display settings.
  *
- * The hypercube always has three dimensions:
- *   0. RowNo()         — auto-injected; ensures duplicate/empty lines are preserved
- *   1. Script text     — user-supplied field (one line per row)
- *   2. Script source   — user-supplied field (e.g. FileName)
+ * The user adds two dimensions (script text + script source).
+ * A RowNo() dimension is automatically injected at index 0 by the component
+ * at runtime to prevent the engine from deduplicating identical script lines.
  */
 export default {
     showTitles: true,
@@ -16,18 +15,10 @@ export default {
     subtitle: '',
     footnote: '',
     qHyperCubeDef: {
-        qDimensions: [
-            {
-                qDef: {
-                    qFieldDefs: ['=RowNo()'],
-                    qFieldLabels: [''],
-                    qSortCriterias: [{ qSortByNumeric: 1, qSortByAscii: 0 }],
-                },
-                qNullSuppression: false,
-            },
-        ],
+        qDimensions: [],
         qMeasures: [],
-        // 3 columns × 3333 rows = 9999 cells (Qlik limit: 10 000 cells per page)
+        // qWidth: 3 anticipates the injected RowNo() column; Qlik returns fewer
+        // columns gracefully when only 2 user dims are present.
         qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],
         qSuppressZero: false,
         qSuppressMissing: false,

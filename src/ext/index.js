@@ -39,6 +39,17 @@ export default function ext(_galaxy) {
             items: {
                 data: {
                     uses: 'data',
+                    items: {
+                        dimensionsHint: {
+                            component: 'text',
+                            label:
+                                'Add 2 dimensions in order:\n\n' +
+                                '1 · Script text — the field where each row contains one line of Qlik script ' +
+                                '(e.g. "Script_Data").\n\n' +
+                                '2 · Script source — a field that uniquely identifies the script file or app ' +
+                                '(e.g. "FileName", "AppID"). Used for multi-source filtering.',
+                        },
+                    },
                 },
                 viewerSection: viewerSection(),
                 toolbarSection: toolbarSection(),

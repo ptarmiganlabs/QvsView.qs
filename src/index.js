@@ -14,6 +14,7 @@ import {
     useLayout,
     useEffect,
     useModel,
+    useRef,
     useState,
     onContextMenu,
 } from '@nebula.js/stardust';
@@ -69,9 +70,79 @@ export default function supernova(_galaxy) {
             const [activeIds, setActiveIds] = useState(null);
             const [bnfReady, setBnfReady] = useState(false);
 
+            /**
+             * Guard flag: prevents a second setProperties call being dispatched
+             * while the first async injection round-trip is still in flight.
+             */
+            const rowNoInjecting = useRef(false);
+
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
             }, []);
+
+            // Silently inject RowNo() at qDimensions[0] when it is not yet present.
+            // This runs once the user has added at least one user dimension and
+            // transparently migrates both new and legacy (pre-RowNo) objects.
+            // The guard ref prevents a second call while the async round-trip is
+            // in flight; the isRowNoDimension check prevents re-injection on the
+            // updated layout that follows setProperties().
+            useEffect(() => {
+                if (!layout || !model) return;
+
+                const hc = layout.qHyperCube;
+                const dimCount = hc?.qDimensionInfo?.length ?? 0;
+
+                // Nothing to inject until the user has added at least one dim
+                if (dimCount < 1) return;
+
+                // Already injected — reset the in-flight guard for future removals
+                if (isRowNoDimension(hc)) {
+                    rowNoInjecting.current = false;
+                    return;
+                }
+
+                // Avoid a second dispatch while the first is still in flight
+                if (rowNoInjecting.current) return;
+                rowNoInjecting.current = true;
+
+                model
+                    .getProperties()
+                    .then((props) => {
+                        const dims = props.qHyperCubeDef?.qDimensions ?? [];
+                        if (dims.length === 0) return;
+
+                        // Re-check inside the async callback (race-condition guard)
+                        if (dims[0]?.qDef?.qFieldDefs?.[0]?.includes('RowNo()')) return;
+
+                        logger.info('Injecting RowNo() dimension at index 0');
+                        return model.setProperties({
+                            ...props,
+                            qHyperCubeDef: {
+                                ...props.qHyperCubeDef,
+                                qDimensions: [
+                                    {
+                                        qDef: {
+                                            qFieldDefs: ['=RowNo()'],
+                                            qFieldLabels: [''],
+                                            qSortCriterias: [
+                                                { qSortByNumeric: 1, qSortByAscii: 0 },
+                                            ],
+                                        },
+                                        qNullSuppression: false,
+                                    },
+                                    ...dims,
+                                ],
+                                // Widen the initial fetch to cover the new column
+                                qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],
+                            },
+                        });
+                    })
+                    .catch((err) => {
+                        // Silently ignore — the object may be read-only (view mode)
+                        logger.debug('RowNo injection skipped:', err);
+                        rowNoInjecting.current = false;
+                    });
+            }, [layout, model]);
 
             // Handle runtime BNF loading based on property toggle
             useEffect(() => {
@@ -111,7 +182,8 @@ export default function supernova(_galaxy) {
                     });
 
                 // Also fetch active identifiers from the hypercube
-                if (layout.qHyperCube?.qDimensionInfo?.[2]) {
+                const idDimIndex = isRowNoDimension(layout.qHyperCube) ? 2 : 1;
+                if (layout.qHyperCube?.qDimensionInfo?.[idDimIndex]) {
                     fetchActiveIdentifiers(layout, model).then(setActiveIds);
                 } else {
                     setActiveIds(null);
@@ -142,12 +214,14 @@ export default function supernova(_galaxy) {
             useEffect(() => {
                 if (!layout) return;
 
-                // All three dimensions must be configured before rendering
+                // Both user dimensions must be configured before rendering.
+                // RowNo() may or may not be injected yet; we only require the
+                // two user-supplied dims (script text + script source).
                 const dimCount = layout.qHyperCube?.qDimensionInfo?.length ?? 0;
-                if (dimCount < 3) {
+                if (dimCount < 2) {
                     renderPlaceholder(
                         element,
-                        'Add script text and source dimensions to view scripts'
+                        'Add both script text and source dimensions to view scripts'
                     );
                     return;
                 }
@@ -301,17 +375,40 @@ function handleAiAnalyze(info, aiOpts) {
 }
 
 /**
+ * Determine whether the first hypercube dimension is the auto-injected RowNo().
+ *
+ * When RowNo() is present, the column layout is:
+ *   col 0 — RowNo()      (discard)
+ *   col 1 — script text
+ *   col 2 — identifier   (optional)
+ *
+ * When RowNo() is absent (legacy or pre-injection layout):
+ *   col 0 — script text
+ *   col 1 — identifier   (optional)
+ *
+ * @param {object|null|undefined} hc - The qHyperCube from the layout.
+ *
+ * @returns {boolean} True when RowNo() occupies column 0.
+ */
+function isRowNoDimension(hc) {
+    if (!hc) return false;
+    // qGroupFieldDefs is populated in NxDimensionInfo for expression-based dims
+    const fieldDef = hc.qDimensionInfo?.[0]?.qGroupFieldDefs?.[0] ?? '';
+    if (fieldDef.includes('RowNo()')) return true;
+    // Fallback: if the engine uses the expression as the fallback title
+    const title = hc.qDimensionInfo?.[0]?.qFallbackTitle ?? '';
+    return title === 'RowNo()';
+}
+
+/**
  * Fetch all rows from the hypercube, paginating if necessary.
  *
- * The RowNo() dimension at index 0 prevents the engine from deduplicating
- * identical or empty script lines, so every row is preserved in order.
+ * Supports both column layouts transparently:
+ *   New (RowNo injected)  — col 0 = RowNo, col 1 = text, col 2 = identifier
+ *   Legacy (no RowNo)     — col 0 = text,  col 1 = identifier
+ *
  * The hypercube is selection-aware — only rows matching active selections
  * are included.
- *
- * Column layout (matches qHyperCubeDef.qDimensions order):
- *   col 0 — RowNo()      (discarded; present only to block deduplication)
- *   col 1 — script text
- *   col 2 — identifier   (present only when a third dimension is configured)
  *
  * @param {object} layout - Qlik Sense layout object.
  * @param {object} model - Qlik engine model (GenericObject).
@@ -327,8 +424,10 @@ async function fetchAllRows(layout, model) {
     if (totalRows === 0) return null;
 
     const colCount = hc.qSize?.qcx || 1;
-    // Identifier is in col 2 — only present when all three dimensions are configured
-    const hasIdentifier = colCount >= 3;
+    const newFormat = isRowNoDimension(hc);
+    const textCol = newFormat ? 1 : 0;
+    const idCol = newFormat ? 2 : 1;
+    const hasIdentifier = newFormat ? colCount >= 3 : colCount >= 2;
 
     // Collect rows from initial data pages
     const result = [];
@@ -337,10 +436,13 @@ async function fetchAllRows(layout, model) {
         for (const page of pages) {
             if (page.qMatrix) {
                 for (const row of page.qMatrix) {
-                    if (row.length > 1) {
+                    if (row.length > textCol) {
                         result.push({
-                            text: row[1]?.qText ?? '',
-                            id: hasIdentifier && row.length > 2 ? (row[2]?.qText ?? null) : null,
+                            text: row[textCol]?.qText ?? '',
+                            id:
+                                hasIdentifier && row.length > idCol
+                                    ? (row[idCol]?.qText ?? null)
+                                    : null,
                         });
                     }
                 }
@@ -367,10 +469,13 @@ async function fetchAllRows(layout, model) {
             const matrix = dataPages[0].qMatrix;
             if (!matrix || matrix.length === 0) break;
             for (const row of matrix) {
-                if (row.length > 1) {
+                if (row.length > textCol) {
                     result.push({
-                        text: row[1]?.qText ?? '',
-                        id: hasIdentifier && row.length > 2 ? (row[2]?.qText ?? null) : null,
+                        text: row[textCol]?.qText ?? '',
+                        id:
+                            hasIdentifier && row.length > idCol
+                                ? (row[idCol]?.qText ?? null)
+                                : null,
                     });
                 }
             }
@@ -391,7 +496,9 @@ async function fetchAllRows(layout, model) {
  * filter pane, only matching rows appear. This makes it the correct source
  * for determining which script sources are "active".
  *
- * The identifier is in column 2 (qDimensions index 2 — the third dimension).
+ * Supports both column layouts:
+ *   New (RowNo injected)  — identifier is at col 2 (qDimensionInfo[2])
+ *   Legacy (no RowNo)     — identifier is at col 1 (qDimensionInfo[1])
  *
  * Strategy:
  * 1. Scan the pre-fetched qDataPages (no engine round-trip). If >1 distinct
@@ -409,21 +516,26 @@ async function fetchAllRows(layout, model) {
  */
 async function fetchActiveIdentifiers(layout, model) {
     const hc = layout?.qHyperCube;
-    if (!hc?.qDimensionInfo?.[2]) return null;
+    if (!hc) return null;
+
+    const newFormat = isRowNoDimension(hc);
+    const idCol = newFormat ? 2 : 1;
+
+    if (!hc.qDimensionInfo?.[idCol]) return null;
 
     const totalRows = hc.qSize?.qcy || 0;
     if (totalRows === 0) return [];
 
     const colCount = hc.qSize?.qcx || 1;
-    if (colCount < 3) return null;
+    if (colCount <= idCol) return null;
 
     // ── Step 1: scan pre-fetched qDataPages (no engine round-trip) ──
     const idSet = new Set();
     let rowsSeen = 0;
     for (const page of hc.qDataPages || []) {
         for (const row of page.qMatrix || []) {
-            if (row.length > 2) {
-                const id = row[2]?.qText;
+            if (row.length > idCol) {
+                const id = row[idCol]?.qText;
                 if (id != null && id !== '') {
                     idSet.add(id);
                 }
@@ -454,8 +566,8 @@ async function fetchActiveIdentifiers(layout, model) {
             ]);
             for (const page of dataPages || []) {
                 for (const row of page.qMatrix || []) {
-                    if (row.length > 2) {
-                        const id = row[2]?.qText;
+                    if (row.length > idCol) {
+                        const id = row[idCol]?.qText;
                         if (id != null && id !== '') {
                             idSet.add(id);
                         }
