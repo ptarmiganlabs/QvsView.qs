@@ -116,13 +116,14 @@ export default function supernova(_galaxy) {
 
                         logger.info('Injecting RowNo() dimension at index 0');
 
-                        // Sort the user dims first (by their load-order criteria),
-                        // then RowNo last (it only prevents deduplication).
-                        // qInterColumnSortOrder indices refer to qDimensions array
-                        // positions after injection: RowNo=0, userDim1=1, userDim2=2, …
+                        // RowNo() evaluates to the physical (load-order) row number for
+                        // each data row, so sorting by it numerically ascending preserves
+                        // the original script line order.
+                        // qInterColumnSortOrder [0, 1, …] keeps RowNo as the primary sort
+                        // key; all user dims follow as tie-breakers.
                         const interColumnSortOrder = [
-                            ...Array.from({ length: dims.length }, (_, i) => i + 1),
                             0,
+                            ...Array.from({ length: dims.length }, (_, i) => i + 1),
                         ];
 
                         return model.setProperties({
@@ -142,7 +143,7 @@ export default function supernova(_galaxy) {
                                     },
                                     ...dims,
                                 ],
-                                // User dims are primary sort (load order); RowNo is last
+                                // RowNo numeric ascending = script line order
                                 qInterColumnSortOrder: interColumnSortOrder,
                                 // Widen the initial fetch to cover the new column
                                 qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],

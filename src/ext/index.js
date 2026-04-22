@@ -51,6 +51,9 @@ export default function ext(_galaxy) {
                         },
                     },
                 },
+                sorting: {
+                    uses: 'sorting',
+                },
                 viewerSection: viewerSection(),
                 toolbarSection: toolbarSection(),
                 aiSection: aiSection(),
