@@ -21,7 +21,7 @@ import {
 import ext from './ext/index.js';
 import data from './data.js';
 import definition from './object-properties.js';
-import { renderViewer, renderPlaceholder, renderWarning } from './ui/viewer.js';
+import { renderViewer, renderPlaceholder, renderLoading, renderWarning } from './ui/viewer.js';
 import { applyRuntimeBnf, resetToStaticBnf } from './syntax/keywords.js';
 import { fetchRuntimeBnf, clearBnfCache } from './syntax/bnf-loader.js';
 import logger, { PACKAGE_VERSION, BUILD_DATE } from './util/logger.js';
@@ -99,6 +99,12 @@ export default function supernova(_galaxy) {
             useEffect(() => {
                 if (!layout || !model) return;
 
+                // Reset immediately so the render effect never sees a stale rawRows/activeIds
+                // combination (e.g. new activeIds arriving before new rawRows would otherwise
+                // produce an empty filteredRows and trigger the wrong placeholder).
+                setRawRows(null);
+                setActiveIds(null);
+
                 /**
                  * Load raw row data, preferring GetTableData over hypercube.
                  * Returns per-row objects with text and optional identifier.
@@ -156,12 +162,19 @@ export default function supernova(_galaxy) {
                 if (!layout) return;
 
                 // Both dimensions must be configured before rendering
-                if ((layout.qHyperCube?.qDimensionInfo?.length ?? 0) < 2) {
+                const dimCount = layout.qHyperCube?.qDimensionInfo?.length ?? 0;
+                if (dimCount < 2) {
                     renderPlaceholder(element, 'Add both dimensions to view scripts');
                     return;
                 }
 
-                if (!rawRows || rawRows.length === 0) {
+                // rawRows === undefined → data fetch still in-flight (show loading state)
+                // rawRows === null or [] → fetch completed but returned nothing usable
+                if (typeof rawRows === 'undefined') {
+                    renderLoading(element);
+                    return;
+                }
+                if (!Array.isArray(rawRows) || rawRows.length === 0) {
                     renderPlaceholder(element);
                     return;
                 }

@@ -1,0 +1,71 @@
+///$tab Main
+SET ThousandSep=' ';
+SET DecimalSep=',';
+SET MoneyThousandSep=' ';
+SET MoneyDecimalSep=',';
+SET MoneyFormat='# ##0,00 kr;-# ##0,00 kr';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='YYYY-MM-DD';
+SET TimestampFormat='YYYY-MM-DD hh:mm:ss[.fff]';
+SET FirstWeekDay=0;
+SET BrokenWeeks=0;
+SET ReferenceDay=4;
+SET FirstMonthOfYear=1;
+SET CollationLocale='sv-SE';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='jan.;feb.;mars;apr.;maj;juni;juli;aug.;sep.;okt.;nov.;dec.';
+SET LongMonthNames='januari;februari;mars;april;maj;juni;juli;augusti;september;oktober;november;december';
+SET DayNames='mån;tis;ons;tors;fre;lör;sön';
+SET LongDayNames='måndag;tisdag;onsdag;torsdag;fredag;lördag;söndag';
+SET NumericalAbbreviation='3:k;6:M;9:G;12:T;15:P;18:E;21:Z;24:Y;-3:m;-6:μ;-9:n;-12:p;-15:f;-18:a;-21:z;-24:y';
+
+///$tab Section
+Tickets:
+LOAD
+    "Summons Number",
+    "Plate ID",
+    "Registration State",
+    "Plate Type",
+    "Issue Date",
+    "Violation Code",
+    "Vehicle Body Type",
+    "Vehicle Make",
+    "Issuing Agency",
+    "Street Code1",
+    "Street Code2",
+    "Street Code3",
+    "Vehicle Expiration Date",
+    "Violation Location",
+    "Violation Precinct",
+    "Issuer Precinct",
+    "Issuer Code",
+    "Issuer Command",
+    "Issuer Squad",
+    "Violation Time",
+    "Time First Observed",
+    "Violation County",
+    "Violation In Front Of Or Opposite",
+    "House Number",
+    "Street Name",
+    "Intersecting Street",
+    "Date First Observed",
+    "Law Section",
+    "Sub Division",
+    "Violation Legal Code",
+    "Days Parking In Effect",
+    "From Hours In Effect",
+    "To Hours In Effect",
+    "Vehicle Color",
+    "Unregistered Vehicle?",
+    "Vehicle Year",
+    "Meter Number",
+    "Feet From Curb",
+    "Violation Post Code",
+    "Violation Description",
+    "No Standing or Stopping Violation",
+    "Hydrant Violation",
+    "Double Parking Violation"
+FROM [lib://Test data/kaggle/nyc-parking-tickets/*.csv]
+// FROM [lib://Test data/kaggle/nyc-parking-tickets/Parking_Violations_Issued_-_Fiscal_Year_2017.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+

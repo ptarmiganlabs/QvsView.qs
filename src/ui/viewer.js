@@ -648,6 +648,25 @@ export function renderPlaceholder(element, message = 'Add both dimensions to vie
 }
 
 /**
+ * Render a loading state while script data is being fetched from the engine.
+ *
+ * Visually distinct from the placeholder (pulsing opacity) so the user knows
+ * data is in-flight rather than the extension being unconfigured.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ *
+ * @returns {void}
+ */
+export function renderLoading(element) {
+    element.innerHTML = `
+        <div class="${CSS_PREFIX}-placeholder ${CSS_PREFIX}-loading">
+            <div class="${CSS_PREFIX}-placeholder-icon">&#60;/&#62;</div>
+            <div class="${CSS_PREFIX}-placeholder-text">Loading script\u2026</div>
+        </div>
+    `;
+}
+
+/**
  * Render a warning when multiple script sources are detected.
  *
  * Shows an amber-tinted warning with the list of detected sources so the
