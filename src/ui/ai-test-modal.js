@@ -86,8 +86,12 @@ export function showAiTestModal({ properties, container = document.body }) {
     container.appendChild(backdrop);
 
     // ── Close handler ──
-    /** Remove the modal from the DOM and clean up listeners. */
+    /** @type {AbortController|null} Controller for the in-flight test request. */
+    let abortController = null;
+
+    /** Remove the modal from the DOM, abort any in-flight request, and clean up listeners. */
     function close() {
+        abortController?.abort();
         document.removeEventListener('keydown', handleKeydown);
         backdrop.removeEventListener('click', handleBackdropClick);
         backdrop.remove();
@@ -170,19 +174,31 @@ export function showAiTestModal({ properties, container = document.body }) {
      */
     function promptApiKey(providerName) {
         return new Promise((resolve) => {
+            const promptId = `${CSS_PREFIX}-ai-key-prompt-text`;
+            const inputId = `${CSS_PREFIX}-ai-key-input`;
+            const noteId = `${CSS_PREFIX}-ai-key-note`;
+
             body.innerHTML = `
                 <div class="${CSS_PREFIX}-ai-key-prompt">
-                    <p>Enter your <strong>${escapeHtml(providerName)}</strong> API key to run the test:</p>
-                    <input type="password" class="${CSS_PREFIX}-ai-key-input" placeholder="sk-…" autocomplete="off" />
+                    <p id="${promptId}">Enter your <strong>${escapeHtml(providerName)}</strong> API key to run the test:</p>
+                    <label for="${inputId}">${escapeHtml(providerName)} API key</label>
+                    <input
+                        id="${inputId}"
+                        type="password"
+                        class="${CSS_PREFIX}-ai-key-input"
+                        placeholder="sk-…"
+                        autocomplete="off"
+                        aria-describedby="${promptId} ${noteId}"
+                    />
                     <div class="${CSS_PREFIX}-ai-key-actions">
                         <button class="${CSS_PREFIX}-ai-btn ${CSS_PREFIX}-ai-key-ok">Run Test</button>
                         <button class="${CSS_PREFIX}-ai-btn ${CSS_PREFIX}-ai-key-cancel">Cancel</button>
                     </div>
-                    <p class="${CSS_PREFIX}-ai-key-note">Key is cached in sessionStorage for this browser session only.</p>
+                    <p id="${noteId}" class="${CSS_PREFIX}-ai-key-note">Key is cached in sessionStorage for this browser session only.</p>
                 </div>
             `;
 
-            const input = body.querySelector(`.${CSS_PREFIX}-ai-key-input`);
+            const input = body.querySelector(`#${CSS_PREFIX}-ai-key-input`);
             const okBtn = body.querySelector(`.${CSS_PREFIX}-ai-key-ok`);
             const cancelBtn = body.querySelector(`.${CSS_PREFIX}-ai-key-cancel`);
 
@@ -232,6 +248,9 @@ export function showAiTestModal({ properties, container = document.body }) {
         steps[1].status = 'active';
         renderSteps(steps);
 
+        // Create an AbortController so closing the modal cancels the in-flight request
+        abortController = new AbortController();
+
         let result;
         try {
             // Step 1 complete → Step 2 active
@@ -239,10 +258,15 @@ export function showAiTestModal({ properties, container = document.body }) {
             steps[2].status = 'active';
             renderSteps(steps);
 
-            result = await testConnection(aiConfig, { apiKey });
+            result = await testConnection(aiConfig, { apiKey, signal: abortController.signal });
+
+            // If the modal was closed while waiting, do nothing
+            if (!backdrop.isConnected) return;
 
             steps[2].status = 'done';
         } catch (err) {
+            if (!backdrop.isConnected) return;
+
             steps[2].status = 'error';
             const escaped = escapeHtml(err.message || 'Connection failed').replace(/\n/g, '<br>');
             renderSteps(

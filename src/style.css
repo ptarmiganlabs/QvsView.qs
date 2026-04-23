@@ -948,6 +948,16 @@
     margin: 0 0 12px;
 }
 
+.qvs-ai-key-prompt label {
+    align-self: flex-start;
+    margin-bottom: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    width: 320px;
+    max-width: 100%;
+}
+
 .qvs-ai-key-input {
     width: 320px;
     max-width: 100%;
