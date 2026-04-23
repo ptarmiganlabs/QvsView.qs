@@ -4,6 +4,11 @@
  * Defines the initial property state when the extension is first
  * dropped onto a sheet. Includes the hypercube definition and
  * viewer display settings.
+ *
+ * The user adds exactly three dimensions (all required):
+ *   1. Row number  — load-order row number field (e.g. a field set to RecNo() or RowNo() during load)
+ *   2. Script text — field where each row is one line of Qlik script
+ *   3. Script source — field identifying the script file or app
  */
 export default {
     showTitles: true,
@@ -13,7 +18,7 @@ export default {
     qHyperCubeDef: {
         qDimensions: [],
         qMeasures: [],
-        qInitialDataFetch: [{ qWidth: 2, qHeight: 5000 }],
+        qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],
         qSuppressZero: false,
         qSuppressMissing: false,
     },

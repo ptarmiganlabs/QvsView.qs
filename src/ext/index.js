@@ -39,6 +39,22 @@ export default function ext(_galaxy) {
             items: {
                 data: {
                     uses: 'data',
+                    items: {
+                        dimensionsHint: {
+                            component: 'text',
+                            label:
+                                'Add all 3 dimensions (required) in order:\n\n' +
+                                '1 · Row number — a field holding the load-order row number ' +
+                                '(e.g. a field populated with RecNo() or RowNo() during the data load script).\n\n' +
+                                '2 · Script text — the field where each row contains one line of Qlik script ' +
+                                '(e.g. "Script_Data").\n\n' +
+                                '3 · Script source — a field that uniquely identifies the script file or app ' +
+                                '(e.g. "FileName", "AppID"). Used for multi-source filtering.',
+                        },
+                    },
+                },
+                sorting: {
+                    uses: 'sorting',
                 },
                 viewerSection: viewerSection(),
                 toolbarSection: toolbarSection(),

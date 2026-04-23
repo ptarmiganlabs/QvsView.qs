@@ -1,45 +1,66 @@
 /**
  * Hypercube data target definition for QvsView.qs.
  *
- * Defines two required dimension targets:
- *   1. The field containing script text — one row per line.
- *   2. A field identifying the script source (e.g. FileName).
- *      When multiple distinct values exist, a warning is shown.
+ * The user configures exactly three dimensions in this order:
+ *   1. Row number    — field holding the per-row load-order number (e.g. a field
+ *                      populated with RecNo() or RowNo() during the data load).
+ *                      Sorting by this dimension numerically ascending preserves
+ *                      the original script line order.
+ *   2. Script text   — field where each row is one line of Qlik script.
+ *   3. Script source — field identifying the script (e.g. FileName, AppID).
+ *                      Used for multi-source filtering.
+ *
+ * min: 3  — all three dimensions are required.
+ * max: 3  — exactly three dimensions; no more.
  */
+
 export default {
     targets: [
         {
             path: '/qHyperCubeDef',
             dimensions: {
-                min: 2,
-                max: 2,
+                min: 3,
+                max: 3,
                 /**
-                 * Description labels for the dimension picker.
+                 * Description labels shown in the property panel dimension picker.
                  *
-                 * @param {object} _properties - Object properties.
-                 * @param {number} index - Dimension index (0-based).
+                 * Column layout is always:
+                 *   index 0 — Row number   (required)
+                 *   index 1 — Script text  (required)
+                 *   index 2 — Script source (required)
+                 *
+                 * @param {object} _properties - Object properties (unused).
+                 * @param {number} index - Dimension index (0-based) in qDimensions.
                  *
                  * @returns {string} The label text.
                  */
                 description(_properties, index) {
-                    return index === 0
-                        ? 'Field containing script text'
-                        : 'Field identifying the script source';
+                    if (index === 0)
+                        return 'Dim 1 · Row number — field holding the load-order row number (e.g. a field set to RecNo() or RowNo() during load)';
+                    if (index === 1)
+                        return 'Dim 2 · Script text — field where each row is one line of Qlik script (e.g. "Script_Data")';
+                    if (index === 2)
+                        return 'Dim 3 · Script source — field identifying the script file or app (e.g. "FileName", "AppID")';
+                    return '';
                 },
                 /**
                  * Called when a dimension is added by the user.
-                 * Forces sort by load order on the first dimension so script
-                 * lines stay in their original sequence.
+                 * Applies numeric-ascending sort to the row number dimension so
+                 * the engine returns lines in load order by default.
+                 *
+                 * Row number field must be numeric for correct sort order.
+                 * Fields created with RecNo() or RowNo() during the load script
+                 * satisfy this requirement automatically.
                  *
                  * @param {object} dimension - The NxDimension being added.
-                 * @param {object} _properties - Object properties.
-                 * @param {number} index - Dimension index (0-based).
+                 * @param {object} _properties - Object properties (unused).
+                 * @param {number} index - Dimension index (0-based) in qDimensions.
                  */
                 added(dimension, _properties, index) {
                     if (index === 0) {
                         dimension.qDef.qSortCriterias = [
                             {
-                                qSortByLoadOrder: 1,
+                                qSortByNumeric: 1,
                                 qSortByAscii: 0,
                             },
                         ];
