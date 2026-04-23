@@ -19,10 +19,6 @@ export default {
         qDimensions: [],
         qMeasures: [],
         qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],
-        // Dimension 0 (row number) is the primary sort key.
-        // This ensures the engine returns script lines in load order
-        // regardless of any default alphabetical sort on later dimensions.
-        qInterColumnSortOrder: [0, 1, 2],
         qSuppressZero: false,
         qSuppressMissing: false,
     },
