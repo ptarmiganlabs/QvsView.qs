@@ -57,6 +57,36 @@ export function estimateTokens(text) {
 }
 
 /**
+ * Send a simple "Hello, who are you?" test prompt to the configured AI provider.
+ * Used to verify connectivity and basic configuration from the property panel.
+ *
+ * @param {object} config - The full ai config from properties (properties.ai).
+ * @param {object} [options] - Additional options.
+ * @param {string} [options.apiKey] - API key (for OpenAI / Anthropic).
+ *
+ * @returns {Promise<{content: string, model: string, provider: string}>}
+ *   The provider's response.
+ */
+export async function testConnection(config, options = {}) {
+    const provider = config.provider || 'ollama';
+    const systemPrompt = 'You are a helpful AI assistant.';
+    const userMessage = 'Hello! Who are you? Please respond with a brief introduction.';
+
+    logger.info(`AI connection test: provider=${provider}`);
+
+    switch (provider) {
+        case 'ollama':
+            return callOllama(config.ollama || {}, systemPrompt, userMessage);
+        case 'openai':
+            return callOpenAI(config.openai || {}, systemPrompt, userMessage, options.apiKey);
+        case 'anthropic':
+            return callAnthropic(config.anthropic || {}, systemPrompt, userMessage, options.apiKey);
+        default:
+            throw new Error(`Unknown AI provider: ${provider}`);
+    }
+}
+
+/**
  * Call Ollama's generate API.
  *
  * @param {object} cfg - Ollama config (endpoint, model).
