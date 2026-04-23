@@ -5,10 +5,10 @@
  * dropped onto a sheet. Includes the hypercube definition and
  * viewer display settings.
  *
- * The user adds three dimensions:
- *   1. Row number  — load-order row number field (e.g. a field set to RecNo() during load)
+ * The user adds exactly three dimensions (all required):
+ *   1. Row number  — load-order row number field (e.g. a field set to RecNo() or RowNo() during load)
  *   2. Script text — field where each row is one line of Qlik script
- *   3. Script source — field identifying the script file or app (optional)
+ *   3. Script source — field identifying the script file or app
  */
 export default {
     showTitles: true,
@@ -19,6 +19,10 @@ export default {
         qDimensions: [],
         qMeasures: [],
         qInitialDataFetch: [{ qWidth: 3, qHeight: 3333 }],
+        // Dimension 0 (row number) is the primary sort key.
+        // This ensures the engine returns script lines in load order
+        // regardless of any default alphabetical sort on later dimensions.
+        qInterColumnSortOrder: [0, 1, 2],
         qSuppressZero: false,
         qSuppressMissing: false,
     },

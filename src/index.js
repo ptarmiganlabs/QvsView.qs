@@ -110,8 +110,7 @@ export default function supernova(_galaxy) {
                         setRawRows(null);
                     });
 
-                // Also fetch active identifiers from the hypercube
-                // Script source is at col 2 (index 2) — only present when 3 dims are configured
+                // Fetch active identifiers from the hypercube (script source is always at col 2)
                 if (layout.qHyperCube?.qDimensionInfo?.[2]) {
                     fetchActiveIdentifiers(layout, model).then(setActiveIds);
                 } else {
@@ -143,12 +142,12 @@ export default function supernova(_galaxy) {
             useEffect(() => {
                 if (!layout) return;
 
-                // Both required dimensions (row number + script text) must be configured.
+                // All three dimensions (row number + script text + script source) must be configured.
                 const dimCount = layout.qHyperCube?.qDimensionInfo?.length ?? 0;
-                if (dimCount < 2) {
+                if (dimCount < 3) {
                     renderPlaceholder(
                         element,
-                        'Add the row number and script text dimensions to view scripts'
+                        'Add all 3 dimensions (row number, script text, script source) to view scripts'
                     );
                     return;
                 }
@@ -304,10 +303,10 @@ function handleAiAnalyze(info, aiOpts) {
 /**
  * Fetch all rows from the hypercube, paginating if necessary.
  *
- * Column layout (fixed — user supplies all three dims):
+ * Column layout (fixed — all three dims required):
  *   col 0 — row number  (used for sorting; not extracted here)
  *   col 1 — script text
- *   col 2 — script source / identifier (optional)
+ *   col 2 — script source / identifier
  *
  * The hypercube is selection-aware — only rows matching active selections
  * are included.
@@ -316,7 +315,7 @@ function handleAiAnalyze(info, aiOpts) {
  * @param {object} model - Qlik engine model (GenericObject).
  *
  * @returns {Promise<Array<{text: string, id: string|null}>|null>}
- *   Array of per-row objects (text + optional identifier), or null if no data.
+ *   Array of per-row objects (text + identifier), or null if no data.
  */
 async function fetchAllRows(layout, model) {
     const hc = layout?.qHyperCube;
@@ -400,6 +399,8 @@ async function fetchAllRows(layout, model) {
  * for determining which script sources are "active".
  *
  * Identifier (script source) is always at col 2 (qDimensionInfo[2]).
+ * All three dimensions are required; this function returns null only if
+ * the hypercube hasn't received its layout yet.
  *
  * Strategy:
  * 1. Scan the pre-fetched qDataPages (no engine round-trip). If >1 distinct
@@ -413,7 +414,7 @@ async function fetchAllRows(layout, model) {
  * @param {object} model - Qlik engine model (GenericObject).
  *
  * @returns {Promise<string[]|null>} Distinct identifier values currently
- *   in scope, or null when no identifier dimension is configured.
+ *   in scope, or null when the hypercube is not yet available.
  */
 async function fetchActiveIdentifiers(layout, model) {
     const hc = layout?.qHyperCube;
