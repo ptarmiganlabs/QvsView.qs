@@ -37,18 +37,44 @@ function injectCSS() {
  *
  * @param {import('../sections.js').ScriptSection[]} sections - Parsed script sections.
  * @param {number} activeIndex - Index of the currently active section.
+ * @param {number[]|null} [matchCounts] - Optional per-tab match counts for search indicators.
  *
  * @returns {string} HTML string for the tab bar.
  */
-function buildTabBar(sections, activeIndex) {
+function buildTabBar(sections, activeIndex, matchCounts = null) {
     const tabs = sections
-        .map(
-            (s, i) =>
-                `<button class="${CSS_PREFIX}-tab${i === activeIndex ? ` ${CSS_PREFIX}-tab-active` : ''}" data-section-index="${i}">${escapeHTML(s.name)}</button>`
-        )
+        .map((s, i) => {
+            const count = matchCounts ? matchCounts[i] : 0;
+            const indicator =
+                count > 0 ? ` <span class="${CSS_PREFIX}-tab-match-count">${count}</span>` : '';
+            return `<button class="${CSS_PREFIX}-tab${i === activeIndex ? ` ${CSS_PREFIX}-tab-active` : ''}" data-section-index="${i}">${escapeHTML(s.name)}${indicator}</button>`;
+        })
         .join('');
 
     return `<div class="${CSS_PREFIX}-tab-bar">${tabs}</div>`;
+}
+
+/**
+ * Find all search matches across all sections in order.
+ *
+ * Returns a flat array where matches in section 0 come first, followed by
+ * section 1, and so on. This enables global prev/next navigation across tabs.
+ *
+ * @param {import('../sections.js').ScriptSection[]} sections - All script sections.
+ * @param {string} query - Search string (case-insensitive).
+ *
+ * @returns {{ sectionIndex: number, start: number, end: number }[]} All matches across sections.
+ */
+function findAllMatches(sections, query) {
+    if (!query) return [];
+    const all = [];
+    for (let i = 0; i < sections.length; i++) {
+        const offsets = findMatchOffsets(sections[i].content, query);
+        for (const m of offsets) {
+            all.push({ sectionIndex: i, start: m.start, end: m.end });
+        }
+    }
+    return all;
 }
 
 /**
@@ -270,16 +296,41 @@ function renderSection(element, opts) {
     // ── Search highlight injection ──
     const searchQuery = element.dataset.qvsSearchQuery || '';
     const searchActive = element.dataset.qvsSearchOpen === '1';
-    let matches = [];
-    let activeMatchIndex = 0;
+    let matches = []; // section-local matches for highlighting
+    let sectionLocalActive = -1; // section-local index of the active match (-1 = none)
+    let totalMatches = 0;
+    let globalActiveIndex = 0;
+    let matchCountsPerTab = null; // per-tab match counts for tab indicator badges
 
     if (searchActive && searchQuery) {
+        const globalMatches = findAllMatches(sections, searchQuery);
+        totalMatches = globalMatches.length;
+
+        const rawMatch = parseInt(element.dataset.qvsSearchMatch || '0', 10);
+        globalActiveIndex = totalMatches > 0 ? rawMatch % totalMatches : 0;
+        element.dataset.qvsSearchMatch = String(globalActiveIndex);
+
+        // Build per-tab match counts for tab bar indicators
+        matchCountsPerTab = new Array(sections.length).fill(0);
+        for (const m of globalMatches) {
+            matchCountsPerTab[m.sectionIndex]++;
+        }
+
+        // Get section-local matches and compute which one is active
         matches = findMatchOffsets(sectionScript, searchQuery);
-        const prevMatch = parseInt(element.dataset.qvsSearchMatch || '0', 10);
-        activeMatchIndex = matches.length > 0 ? prevMatch % matches.length : 0;
-        element.dataset.qvsSearchMatch = String(activeMatchIndex);
 
         if (matches.length > 0) {
+            // Count how many global matches come before this section
+            let priorCount = 0;
+            for (let i = 0; i < activeIndex; i++) {
+                priorCount += findMatchOffsets(sections[i].content, searchQuery).length;
+            }
+
+            // Active match is in this section when the global active is within our range
+            if (totalMatches > 0 && globalMatches[globalActiveIndex].sectionIndex === activeIndex) {
+                sectionLocalActive = globalActiveIndex - priorCount;
+            }
+
             // Auto-expand collapsed regions containing matches
             if (enableFolding) {
                 autoExpandForMatches(matches, sectionScript, foldMap, foldState, hiddenLines);
@@ -293,7 +344,7 @@ function renderSection(element, opts) {
                 finalCodeHTML,
                 sectionScript,
                 matches,
-                activeMatchIndex
+                sectionLocalActive
             );
         }
     }
@@ -305,13 +356,13 @@ function renderSection(element, opts) {
     element.dataset.qvsActiveSection = String(activeIndex);
 
     const searchHTML = searchActive
-        ? buildSearchBar(searchQuery, activeMatchIndex, matches.length, showSearch)
+        ? buildSearchBar(searchQuery, globalActiveIndex, totalMatches, showSearch)
         : '';
 
     element.innerHTML = `
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
-                ${buildTabBar(sections, activeIndex)}
+                ${buildTabBar(sections, activeIndex, matchCountsPerTab)}
                 ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
@@ -331,8 +382,8 @@ function renderSection(element, opts) {
     }
 
     // Scroll to active match after render
-    if (searchActive && matches.length > 0) {
-        if (viewer) scrollToMatch(viewer, activeMatchIndex);
+    if (searchActive && matches.length > 0 && sectionLocalActive >= 0) {
+        if (viewer) scrollToMatch(viewer, sectionLocalActive);
     }
 
     // ── Attach event listeners ──
@@ -342,8 +393,17 @@ function renderSection(element, opts) {
         btn.addEventListener('click', (e) => {
             const idx = parseInt(e.currentTarget.dataset.sectionIndex, 10);
             if (idx === activeIndex) return;
-            // Reset match index and fold state when switching tabs
-            element.dataset.qvsSearchMatch = '0';
+
+            // If search is active, preserve the global match index by jumping to
+            // the first match in the clicked section (or the overall first match).
+            const query = element.dataset.qvsSearchQuery || '';
+            if (query) {
+                const allMatches = findAllMatches(sections, query);
+                const firstInSection = allMatches.findIndex((m) => m.sectionIndex === idx);
+                element.dataset.qvsSearchMatch = String(firstInSection >= 0 ? firstInSection : 0);
+            } else {
+                element.dataset.qvsSearchMatch = '0';
+            }
             element.dataset.qvsFoldState = '';
             renderSection(element, { ...opts, activeIndex: idx });
         });
@@ -525,7 +585,8 @@ function renderSection(element, opts) {
  * Update code highlights and match count without replacing the search bar DOM.
  *
  * This avoids destroying the search input (and losing cursor position / focus)
- * when the user types in the search field.
+ * when the user types in the search field. When the first match is on a
+ * different tab, a full re-render is triggered to switch to that tab.
  *
  * @param {HTMLElement} element - The extension's root DOM element.
  * @param {object} opts - Current render options.
@@ -533,24 +594,32 @@ function renderSection(element, opts) {
  * @returns {void}
  */
 function updateCodeHighlights(element, opts) {
-    const { sections, activeIndex, fontSize } = opts;
+    const { sections, fontSize } = opts;
+    const { activeIndex } = opts;
+    const query = element.dataset.qvsSearchQuery || '';
+
+    // Compute global matches across all sections
+    const globalMatches = findAllMatches(sections, query);
+    element.dataset.qvsSearchMatch = '0';
+    const totalMatches = globalMatches.length;
+
+    // If the first match is on a different tab, do a full re-render to switch tabs
+    if (totalMatches > 0 && globalMatches[0].sectionIndex !== activeIndex) {
+        element.dataset.qvsFoldState = '';
+        renderSection(element, { ...opts, activeIndex: globalMatches[0].sectionIndex });
+        return;
+    }
+
     const section = sections[activeIndex];
     const sectionScript = section.content;
-    const query = element.dataset.qvsSearchQuery || '';
 
     const tokenizedLines = tokenize(sectionScript);
     let codeHTML = renderTokensToHTML(tokenizedLines, CSS_PREFIX);
 
-    let matches = [];
-    const activeMatchIndex = 0;
+    const sectionMatches = query ? findMatchOffsets(sectionScript, query) : [];
 
-    if (query) {
-        matches = findMatchOffsets(sectionScript, query);
-        element.dataset.qvsSearchMatch = '0';
-
-        if (matches.length > 0) {
-            codeHTML = highlightMatches(codeHTML, sectionScript, matches, activeMatchIndex);
-        }
+    if (sectionMatches.length > 0) {
+        codeHTML = highlightMatches(codeHTML, sectionScript, sectionMatches, 0);
     }
 
     // Update only the code element
@@ -560,27 +629,29 @@ function updateCodeHighlights(element, opts) {
         codeEl.style.fontSize = `${fontSize}px`;
     }
 
-    // Update match count text
+    // Update match count text (global count across all tabs)
     const countEl = element.querySelector(`.${CSS_PREFIX}-search-count`);
     if (countEl) {
-        countEl.textContent = query ? `${matches.length > 0 ? 1 : 0} of ${matches.length}` : '';
+        countEl.textContent = query ? `${totalMatches > 0 ? 1 : 0} of ${totalMatches}` : '';
     }
 
     // Update prev/next button state
     const prevBtn = element.querySelector(`.${CSS_PREFIX}-search-prev`);
     const nextBtn = element.querySelector(`.${CSS_PREFIX}-search-next`);
-    if (prevBtn) prevBtn.disabled = matches.length <= 0;
-    if (nextBtn) nextBtn.disabled = matches.length <= 0;
+    if (prevBtn) prevBtn.disabled = totalMatches <= 0;
+    if (nextBtn) nextBtn.disabled = totalMatches <= 0;
 
     // Scroll to first match
-    if (matches.length > 0) {
+    if (sectionMatches.length > 0) {
         const viewer = element.querySelector(`.${CSS_PREFIX}-viewer`);
         if (viewer) scrollToMatch(viewer, 0);
     }
 }
 
 /**
- * Navigate to the next or previous search match.
+ * Navigate to the next or previous search match across all sections.
+ *
+ * Switches the active tab when the target match is in a different section.
  *
  * @param {HTMLElement} element - The extension's root DOM element.
  * @param {object} opts - Current render options (passed to renderSection).
@@ -592,14 +663,21 @@ function navigateMatch(element, opts, direction) {
     const query = element.dataset.qvsSearchQuery || '';
     if (!query) return;
 
-    const section = opts.sections[opts.activeIndex];
-    const total = findMatchOffsets(section.content, query).length;
-    if (total === 0) return;
+    const globalMatches = findAllMatches(opts.sections, query);
+    if (globalMatches.length === 0) return;
 
     const current = parseInt(element.dataset.qvsSearchMatch || '0', 10);
-    const next = (current + direction + total) % total;
+    const next = (current + direction + globalMatches.length) % globalMatches.length;
     element.dataset.qvsSearchMatch = String(next);
-    renderSection(element, opts);
+
+    const targetSection = globalMatches[next].sectionIndex;
+    if (targetSection !== opts.activeIndex) {
+        // Switch to the section containing the next match
+        element.dataset.qvsFoldState = '';
+        renderSection(element, { ...opts, activeIndex: targetSection });
+    } else {
+        renderSection(element, opts);
+    }
 }
 
 /**
