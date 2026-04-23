@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.4.0...qvsview-qs-v0.5.0) (2026-04-23)
+
+
+### Features
+
+* add separate loading-in-progress and not-yet-configured texts in the viewer ([5defdf6](https://github.com/ptarmiganlabs/QvsView.qs/commit/5defdf6ea70d4e51c7fd79d865282ac80ede1d53))
+* Add test data files ([8283f51](https://github.com/ptarmiganlabs/QvsView.qs/commit/8283f511b1cc0a02e7ab74fa21a7cbc18c9905eb))
+* replace GetTableData path with RowNo() hypercube dimension ([c745cd3](https://github.com/ptarmiganlabs/QvsView.qs/commit/c745cd38eb687c637964aac397fff080facd7f7c))
+* replace RowNo injection with user-supplied row number dimension; expose sort in property panel ([22b7028](https://github.com/ptarmiganlabs/QvsView.qs/commit/22b70283eff308f221df4ed4f642cd56c4f738f6))
+
+
+### Bug Fixes
+
+* allow manual AI model entry in property panel ([68439d3](https://github.com/ptarmiganlabs/QvsView.qs/commit/68439d3a13fdd23002a3dcc5c842c00876dcbbce))
+* backward-compat RowNo injection + clear property panel guidance ([a840f92](https://github.com/ptarmiganlabs/QvsView.qs/commit/a840f92e791a79369f6ff9379848856847705e06))
+* clarify shared AI model field behavior ([da2363d](https://github.com/ptarmiganlabs/QvsView.qs/commit/da2363d5b12f6906ad68e21dad7c8ed9354f75c8))
+* remove qInterColumnSortOrder to simplify dimension sorting logic ([9295419](https://github.com/ptarmiganlabs/QvsView.qs/commit/92954199129552da9682f4d0e604bc9b01e9e33b))
+* remove unused sorting section from property panel definition ([5452039](https://github.com/ptarmiganlabs/QvsView.qs/commit/5452039816c9adc0e4ddf10f35792be793448114))
+* restore sorting panel; make all 3 dims required; set qInterColumnSortOrder for correct line order ([ef50302](https://github.com/ptarmiganlabs/QvsView.qs/commit/ef50302d89279cfbe3d4ddf0862cd8a029437220))
+* set qInterColumnSortOrder on RowNo injection; add single-source debug logging ([3d86d15](https://github.com/ptarmiganlabs/QvsView.qs/commit/3d86d15cca038398d933a9393f38bf3541feeba4))
+* sort lines by RowNo (load order); add sorting section to property panel ([7119466](https://github.com/ptarmiganlabs/QvsView.qs/commit/71194661d90e73b18043d54a22d570a3da9d2752))
+* **todos:** mark collapsible code blocks as completed in TODO.md ([7b5827d](https://github.com/ptarmiganlabs/QvsView.qs/commit/7b5827d3c5ec4e407185067d74fe974285df25b8))
+
 ## [0.4.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.3.0...qvsview-qs-v0.4.0) (2026-04-20)
 
 ### Features
