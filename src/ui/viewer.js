@@ -294,18 +294,18 @@ function renderSection(element, opts) {
     }
 
     // ── Search highlight injection ──
+    // Compute global matches once — shared by tab bar indicators, count display, and navigation.
     const searchQuery = element.dataset.qvsSearchQuery || '';
     const searchActive = element.dataset.qvsSearchOpen === '1';
+    const globalMatches = searchActive && searchQuery ? findAllMatches(sections, searchQuery) : [];
+    const totalMatches = globalMatches.length;
+
     let matches = []; // section-local matches for highlighting
     let sectionLocalActive = -1; // section-local index of the active match (-1 = none)
-    let totalMatches = 0;
     let globalActiveIndex = 0;
     let matchCountsPerTab = null; // per-tab match counts for tab indicator badges
 
     if (searchActive && searchQuery) {
-        const globalMatches = findAllMatches(sections, searchQuery);
-        totalMatches = globalMatches.length;
-
         const rawMatch = parseInt(element.dataset.qvsSearchMatch || '0', 10);
         globalActiveIndex = totalMatches > 0 ? rawMatch % totalMatches : 0;
         element.dataset.qvsSearchMatch = String(globalActiveIndex);
@@ -320,11 +320,8 @@ function renderSection(element, opts) {
         matches = findMatchOffsets(sectionScript, searchQuery);
 
         if (matches.length > 0) {
-            // Count how many global matches come before this section
-            let priorCount = 0;
-            for (let i = 0; i < activeIndex; i++) {
-                priorCount += findMatchOffsets(sections[i].content, searchQuery).length;
-            }
+            // Count how many global matches come before this section (reuse globalMatches)
+            const priorCount = globalMatches.filter((m) => m.sectionIndex < activeIndex).length;
 
             // Active match is in this section when the global active is within our range
             if (totalMatches > 0 && globalMatches[globalActiveIndex].sectionIndex === activeIndex) {
@@ -398,6 +395,7 @@ function renderSection(element, opts) {
             // the first match in the clicked section (or the overall first match).
             const query = element.dataset.qvsSearchQuery || '';
             if (query) {
+                // Recompute global matches at click-time (query may have changed since render)
                 const allMatches = findAllMatches(sections, query);
                 const firstInSection = allMatches.findIndex((m) => m.sectionIndex === idx);
                 element.dataset.qvsSearchMatch = String(firstInSection >= 0 ? firstInSection : 0);
@@ -594,8 +592,7 @@ function renderSection(element, opts) {
  * @returns {void}
  */
 function updateCodeHighlights(element, opts) {
-    const { sections, fontSize } = opts;
-    const { activeIndex } = opts;
+    const { sections, fontSize, activeIndex } = opts;
     const query = element.dataset.qvsSearchQuery || '';
 
     // Compute global matches across all sections
