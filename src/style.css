@@ -948,6 +948,16 @@
     margin: 0 0 12px;
 }
 
+.qvs-ai-key-prompt label {
+    align-self: flex-start;
+    margin-bottom: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    width: 320px;
+    max-width: 100%;
+}
+
 .qvs-ai-key-input {
     width: 320px;
     max-width: 100%;
@@ -974,4 +984,78 @@
     margin-top: 12px;
     font-size: 11px;
     color: #aaa;
+}
+
+/* ── AI Connection Test Modal ── */
+
+/* Slightly narrower dialog for the compact test modal */
+.qvs-ai-test-dialog {
+    max-width: 520px;
+}
+
+/* Step list */
+.qvs-ai-test-steps {
+    list-style: none;
+    margin: 8px 0 16px;
+    padding: 0;
+}
+
+.qvs-ai-test-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13.5px;
+    color: #444;
+}
+
+.qvs-ai-test-step:last-child {
+    border-bottom: none;
+}
+
+.qvs-ai-test-step-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+
+.qvs-ai-test-step-active .qvs-ai-test-step-label {
+    color: #1565c0;
+    font-weight: 500;
+}
+
+.qvs-ai-test-step-error .qvs-ai-test-step-label {
+    color: #c62828;
+}
+
+.qvs-ai-test-step-pending .qvs-ai-test-step-label {
+    color: #999;
+}
+
+/* AI response box */
+.qvs-ai-test-response {
+    margin-top: 8px;
+    padding: 12px 14px;
+    background: #f8f9fc;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+
+.qvs-ai-test-response-label {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+}
+
+.qvs-ai-test-response-body {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-wrap;
+    word-break: break-word;
 }

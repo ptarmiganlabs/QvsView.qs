@@ -4,6 +4,8 @@
  * prompt template selection, and custom system prompt override.
  */
 
+import { showAiTestModal } from '../ui/ai-test-modal.js';
+
 /** @type {Array<{value: string, label: string}>} */
 let ollamaModels = [];
 
@@ -613,6 +615,28 @@ export function aiSection() {
                     return properties.ai?.enabled === true && properties.ai?.provider === 'ollama';
                 },
             },
+            ollamaTest: {
+                label: '🧪 Test connection',
+                component: 'button',
+                /**
+                 * Open the AI connection test modal for the Ollama provider.
+                 *
+                 * @param {object} properties - Extension properties.
+                 */
+                action(properties) {
+                    showAiTestModal({ properties });
+                },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return properties.ai?.enabled === true && properties.ai?.provider === 'ollama';
+                },
+            },
 
             // ── OpenAI settings ──
             openaiHeader: {
@@ -755,6 +779,28 @@ export function aiSection() {
                         }
                     }
                     refreshOpenAIModels(endpoint, apiKey);
+                },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return properties.ai?.enabled === true && properties.ai?.provider === 'openai';
+                },
+            },
+            openaiTest: {
+                label: '🧪 Test connection',
+                component: 'button',
+                /**
+                 * Open the AI connection test modal for the OpenAI provider.
+                 *
+                 * @param {object} properties - Extension properties.
+                 */
+                action(properties) {
+                    showAiTestModal({ properties });
                 },
                 /**
                  * Determine visibility based on current properties.
@@ -963,6 +1009,30 @@ export function aiSection() {
                         }
                     }
                     refreshAnthropicModels(endpoint, apiKey);
+                },
+                /**
+                 * Determine visibility based on current properties.
+                 *
+                 * @param {object} properties - Extension properties.
+                 *
+                 * @returns {boolean} Whether the item is visible.
+                 */
+                show(properties) {
+                    return (
+                        properties.ai?.enabled === true && properties.ai?.provider === 'anthropic'
+                    );
+                },
+            },
+            anthropicTest: {
+                label: '🧪 Test connection',
+                component: 'button',
+                /**
+                 * Open the AI connection test modal for the Anthropic provider.
+                 *
+                 * @param {object} properties - Extension properties.
+                 */
+                action(properties) {
+                    showAiTestModal({ properties });
                 },
                 /**
                  * Determine visibility based on current properties.
