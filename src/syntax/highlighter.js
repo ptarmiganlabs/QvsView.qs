@@ -312,14 +312,12 @@ export function renderTokensToHTML(tokenizedLines, prefix) {
     return tokenizedLines
         .map(
             (tokens, i) =>
-                `<div class="${prefix}-line" data-line="${i}">${
-                    tokens
-                        .map((t) => {
-                            const escaped = escapeHTML(t.text);
-                            return `<span class="${prefix}-token-${t.type}">${escaped}</span>`;
-                        })
-                        .join('') || '&nbsp;'
-                }</div>`
+                `<div class="${prefix}-line" data-line="${i}">${tokens
+                    .map((t) => {
+                        const escaped = escapeHTML(t.text);
+                        return `<span class="${prefix}-token-${t.type}">${escaped}</span>`;
+                    })
+                    .join('')}</div>`
         )
         .join('\n');
 }
