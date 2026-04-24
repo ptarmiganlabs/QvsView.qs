@@ -14,6 +14,7 @@ import {
     useLayout,
     useEffect,
     useModel,
+    useApp,
     useState,
     onContextMenu,
 } from '@nebula.js/stardust';
@@ -58,6 +59,7 @@ export default function supernova(_galaxy) {
         component() {
             const layout = useLayout();
             const model = useModel();
+            const app = useApp();
             const element = useElement();
 
             /**
@@ -190,6 +192,20 @@ export default function supernova(_galaxy) {
                 const aiOpts = layout.ai || {};
                 const aiEnabled = aiOpts.enabled === true;
 
+                // App selector: show when enabled AND Dim 3 is configured
+                const showAppSelector = toolbarOpts.showAppSelector === true;
+
+                // Derive distinct selector values from rawRows (Dim 3 = script source)
+                const selectorValues = showAppSelector
+                    ? [...new Set(rawRows.map((r) => r.id).filter(Boolean))].sort((a, b) =>
+                          a.localeCompare(b)
+                      )
+                    : [];
+
+                // Determine selected app: exactly one source active means a selection is set
+                const selectedApp =
+                    showAppSelector && activeIds && activeIds.length === 1 ? activeIds[0] : null;
+
                 renderViewer(element, {
                     script,
                     showLineNumbers: viewerOpts.showLineNumbers !== false,
@@ -199,6 +215,12 @@ export default function supernova(_galaxy) {
                     showCopyButton: toolbarOpts.showCopyButton !== false,
                     showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
                     showSearch: toolbarOpts.showSearch === true,
+                    showAppSelector,
+                    selectorValues,
+                    selectedApp,
+                    onAppSelect: showAppSelector
+                        ? (value) => handleAppSelect(app, layout, value)
+                        : null,
                     showAiAnalysis: aiEnabled,
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
@@ -487,4 +509,65 @@ async function fetchActiveIdentifiers(layout, model) {
     }
 
     return [...idSet];
+}
+
+/**
+ * Extract the script source field name from the 3rd hypercube dimension.
+ *
+ * Handles plain field names, bracket-quoted names (`[FieldName]`), and
+ * expression prefixes (`=[FieldName]`).
+ *
+ * @param {object} layout - Qlik Sense layout object.
+ *
+ * @returns {string|null} The field name, or null if unavailable.
+ */
+function getSourceFieldName(layout) {
+    const dimInfo = layout?.qHyperCube?.qDimensionInfo?.[2];
+    if (!dimInfo) return null;
+
+    // qGroupFieldDefs[0] is the canonical field name for simple (non-grouped) dimensions
+    let fieldName = dimInfo.qGroupFieldDefs?.[0] || dimInfo.qFallbackTitle;
+    if (!fieldName) return null;
+
+    // Strip expression prefix and outer brackets: "=[FieldName]" → "FieldName"
+    fieldName = fieldName.replace(/^=/, '').replace(/^\[|\]$/g, '');
+
+    return fieldName || null;
+}
+
+/**
+ * Handle a script source selection from the selector dropdown.
+ *
+ * Calls `field.selectValues()` to set a selection on the script source field,
+ * or `field.clear()` to remove any selection when value is null.
+ *
+ * @param {object} app - Qlik Doc API (from useApp hook).
+ * @param {object} layout - Qlik Sense layout object.
+ * @param {string|null} value - The selected value text, or null to clear.
+ *
+ * @returns {Promise<void>}
+ */
+async function handleAppSelect(app, layout, value) {
+    if (!app) return;
+
+    const fieldName = getSourceFieldName(layout);
+    if (!fieldName) {
+        logger.warn('App selector: could not determine script source field name');
+        return;
+    }
+
+    try {
+        const field = await app.getField(fieldName);
+        if (!field) return;
+
+        if (value == null) {
+            await field.clear();
+            logger.info(`App selector: cleared selection on "${fieldName}"`);
+        } else {
+            await field.selectValues([{ qText: value, qIsNumeric: false }], false, false);
+            logger.info(`App selector: selected "${value}" in "${fieldName}"`);
+        }
+    } catch (err) {
+        logger.warn('App selector: selection failed:', err);
+    }
 }

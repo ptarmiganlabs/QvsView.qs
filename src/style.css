@@ -298,21 +298,44 @@
     opacity: 0.75;
 }
 
-/* ── App selector (script file selection dropdown) ── */
+/* ── Selector bar (2nd toolbar row — script source selection) ── */
+.qvs-selector-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-top: 1px solid #e8e8e8;
+    background: #f9f9f9;
+    flex-shrink: 0;
+    min-height: 32px;
+}
+
+.qvs-selector-label {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ── App selector (searchable dropdown inside selector bar) ── */
 .qvs-appselector {
     position: relative;
     display: inline-flex;
-    flex-shrink: 0;
+    flex: 1 1 auto;
+    max-width: 400px;
 }
 
 .qvs-appselector-input-wrap {
     position: relative;
     display: inline-flex;
     align-items: center;
+    width: 100%;
 }
 
 .qvs-appselector-input {
-    width: 180px;
+    width: 100%;
+    min-width: 180px;
     padding: 3px 22px 3px 6px;
     border: 1px solid #ccc;
     border-radius: 3px;

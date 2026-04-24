@@ -14,6 +14,9 @@ import { detectFoldRanges, buildFoldMap } from '../syntax/fold-detector.js';
 
 const CSS_PREFIX = 'qvs';
 
+/** Delay (ms) before closing the dropdown on blur — allows click events on options to fire. */
+const DROPDOWN_BLUR_DELAY_MS = 150;
+
 /** @type {boolean} */
 let cssInjected = false;
 
@@ -174,10 +177,205 @@ function buildToolbar(toolbarOpts) {
 }
 
 /**
+ * Build HTML for the selector bar — a 2nd toolbar row containing the
+ * script source searchable dropdown.
+ *
+ * @param {string[]} values - Available values to display in the dropdown.
+ * @param {string|null} selectedValue - Currently selected value, or null.
+ *
+ * @returns {string} HTML string for the selector bar row.
+ */
+function buildSelectorBar(values, selectedValue) {
+    return `<div class="${CSS_PREFIX}-selector-bar">
+        <span class="${CSS_PREFIX}-selector-label">Script source:</span>
+        ${buildAppSelectorHTML(values, selectedValue)}
+    </div>`;
+}
+
+/**
+ * Build HTML for the searchable script source dropdown.
+ *
+ * @param {string[]} values - Available values to choose from.
+ * @param {string|null} selectedValue - Currently selected value, or null.
+ *
+ * @returns {string} HTML string for the dropdown widget.
+ */
+function buildAppSelectorHTML(values, selectedValue) {
+    const displayText = selectedValue || '';
+    const placeholder = selectedValue ? '' : 'Select script source\u2026';
+    const clearBtnStyle = selectedValue ? '' : ' style="display:none"';
+
+    const optionItems = values
+        .map(
+            (v) =>
+                `<div class="${CSS_PREFIX}-appselector-option${v === selectedValue ? ` ${CSS_PREFIX}-appselector-option-selected` : ''}" data-value="${escapeAttr(v)}">${escapeHTML(v)}</div>`
+        )
+        .join('');
+
+    return `<div class="${CSS_PREFIX}-appselector">
+        <div class="${CSS_PREFIX}-appselector-input-wrap">
+            <input class="${CSS_PREFIX}-appselector-input" type="text"
+                   placeholder="${escapeAttr(placeholder)}" value="${escapeAttr(displayText)}"
+                   spellcheck="false" autocomplete="off"
+                   title="Script source selection" />
+            <button class="${CSS_PREFIX}-appselector-clear" title="Clear selection"${clearBtnStyle}>&#10005;</button>
+        </div>
+        <div class="${CSS_PREFIX}-appselector-dropdown" style="display:none">
+            ${optionItems}
+        </div>
+    </div>`;
+}
+
+/**
+ * Escape an HTML attribute value for safe embedding.
+ *
+ * @param {string} text - Raw text to escape.
+ *
+ * @returns {string} Escaped text safe for HTML attributes.
+ */
+function escapeAttr(text) {
+    return (text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/**
+ * Attach event listeners for the script source selection dropdown.
+ *
+ * Handles text-input filtering, option click selection, clear button,
+ * keyboard navigation (Enter / Escape), and outside-click dismissal.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {object} opts - Current render options.
+ *
+ * @returns {void}
+ */
+function attachAppSelectorListeners(element, opts) {
+    const wrapper = element.querySelector(`.${CSS_PREFIX}-appselector`);
+    if (!wrapper) return;
+
+    const input = wrapper.querySelector(`.${CSS_PREFIX}-appselector-input`);
+    const dropdown = wrapper.querySelector(`.${CSS_PREFIX}-appselector-dropdown`);
+    const clearBtn = wrapper.querySelector(`.${CSS_PREFIX}-appselector-clear`);
+    if (!input || !dropdown) return;
+
+    const allOptions = dropdown.querySelectorAll(`.${CSS_PREFIX}-appselector-option`);
+
+    /**
+     * Show/hide dropdown options based on the current filter text.
+     *
+     * @param {string} filter - Filter text (case-insensitive).
+     */
+    function filterOptions(filter) {
+        const lowerFilter = filter.toLowerCase();
+        let anyVisible = false;
+        allOptions.forEach((opt) => {
+            const text = opt.dataset.value || '';
+            const match = !lowerFilter || text.toLowerCase().includes(lowerFilter);
+            opt.style.display = match ? '' : 'none';
+            if (match) anyVisible = true;
+        });
+        dropdown.style.display = anyVisible ? '' : 'none';
+    }
+
+    // Show dropdown on focus
+    input.addEventListener('focus', () => {
+        filterOptions(input.value);
+        dropdown.style.display = '';
+    });
+
+    // Real-time filtering as the user types
+    input.addEventListener('input', () => {
+        filterOptions(input.value);
+        if (clearBtn) {
+            clearBtn.style.display = input.value ? '' : 'none';
+        }
+    });
+
+    // Keyboard: Enter selects first visible option, Escape closes
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            dropdown.style.display = 'none';
+            input.blur();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const firstVisible = Array.from(allOptions).find((opt) => opt.style.display !== 'none');
+            if (firstVisible) {
+                const value = firstVisible.dataset.value;
+                input.value = value;
+                dropdown.style.display = 'none';
+                if (typeof opts.onAppSelect === 'function') {
+                    opts.onAppSelect(value);
+                }
+            }
+        }
+    });
+
+    // Option click handler
+    allOptions.forEach((opt) => {
+        opt.addEventListener('click', () => {
+            const value = opt.dataset.value;
+            input.value = value;
+            dropdown.style.display = 'none';
+            if (typeof opts.onAppSelect === 'function') {
+                opts.onAppSelect(value);
+            }
+        });
+    });
+
+    // Clear button
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            clearBtn.style.display = 'none';
+            dropdown.style.display = 'none';
+            if (typeof opts.onAppSelect === 'function') {
+                opts.onAppSelect(null);
+            }
+        });
+    }
+
+    // Close dropdown when focus leaves the widget
+    wrapper.addEventListener('focusout', () => {
+        setTimeout(() => {
+            if (!wrapper.contains(document.activeElement)) {
+                dropdown.style.display = 'none';
+            }
+        }, DROPDOWN_BLUR_DELAY_MS);
+    });
+
+    // Also close on mousedown outside (for non-focusable area clicks)
+    /**
+     * Close the dropdown when clicking outside the selector widget.
+     *
+     * @param {MouseEvent} evt - The mousedown event.
+     */
+    const onOutsideClick = (evt) => {
+        if (!wrapper.contains(evt.target)) {
+            dropdown.style.display = 'none';
+        }
+    };
+    document.addEventListener('mousedown', onOutsideClick);
+
+    // Remove the document listener when the wrapper is detached (innerHTML replaced on re-render)
+    const observer = new MutationObserver(() => {
+        if (!document.contains(wrapper)) {
+            document.removeEventListener('mousedown', onOutsideClick);
+            observer.disconnect();
+        }
+    });
+    observer.observe(element, { childList: true });
+}
+
+/**
  * Render the script viewer into the given DOM element.
  *
  * Supports section tabs (split on `///$tab` markers), a copy-to-clipboard
- * button, optional line numbers, and word wrap.
+ * button, optional line numbers, word wrap, and an optional script source
+ * selection dropdown shown as a 2nd toolbar row.
  *
  * @param {HTMLElement} element - The extension's root DOM element.
  * @param {object} options - Rendering options.
@@ -185,6 +383,17 @@ function buildToolbar(toolbarOpts) {
  * @param {boolean} [options.showLineNumbers] - Whether to show line numbers.
  * @param {boolean} [options.wordWrap] - Whether to wrap long lines.
  * @param {number} [options.fontSize] - Font size in pixels.
+ * @param {boolean} [options.enableFolding] - Whether code folding is enabled.
+ * @param {boolean} [options.showCopyButton] - Whether to show the copy button.
+ * @param {boolean} [options.showFontSizeDropdown] - Whether to show the font size dropdown.
+ * @param {boolean} [options.showSearch] - Whether the search bar is always visible.
+ * @param {boolean} [options.showAppSelector] - Whether to show the script source selector bar.
+ * @param {string[]} [options.selectorValues] - Available values for the selector dropdown.
+ * @param {string|null} [options.selectedApp] - Currently selected value, or null.
+ * @param {((value: string|null) => void)|null} [options.onAppSelect] - Callback when a value is selected or cleared.
+ * @param {boolean} [options.showAiAnalysis] - Whether to show the AI Analyze button.
+ * @param {object|null} [options.aiConfig] - AI configuration.
+ * @param {((info: object) => void)|null} [options.onAiAnalyze] - Callback for AI Analyze button.
  *
  * @returns {void}
  */
@@ -200,6 +409,10 @@ export function renderViewer(element, options) {
         showCopyButton = true,
         showFontSizeDropdown = false,
         showSearch = false,
+        showAppSelector = false,
+        selectorValues = [],
+        selectedApp = null,
+        onAppSelect = null,
         showAiAnalysis = false,
         aiConfig = null,
         onAiAnalyze = null,
@@ -227,6 +440,10 @@ export function renderViewer(element, options) {
         showCopyButton,
         showFontSizeDropdown,
         showSearch,
+        showAppSelector,
+        selectorValues,
+        selectedApp,
+        onAppSelect,
         showAiAnalysis,
         aiConfig,
         onAiAnalyze,
@@ -247,6 +464,9 @@ export function renderViewer(element, options) {
  * @param {boolean} opts.enableFolding - Whether code folding is enabled.
  * @param {boolean} opts.showCopyButton - Whether to show the copy button.
  * @param {boolean} opts.showFontSizeDropdown - Whether to show the font size dropdown.
+ * @param {boolean} [opts.showAppSelector] - Whether to show the script source selector bar.
+ * @param {string[]} [opts.selectorValues] - Available values for the selector dropdown.
+ * @param {string|null} [opts.selectedApp] - Currently selected value, or null.
  *
  * @returns {void}
  */
@@ -262,6 +482,9 @@ function renderSection(element, opts) {
         showCopyButton,
         showFontSizeDropdown,
         showSearch,
+        showAppSelector = false,
+        selectorValues = [],
+        selectedApp = null,
         showAiAnalysis,
         aiConfig,
     } = opts;
@@ -415,6 +638,7 @@ function renderSection(element, opts) {
             <div class="${CSS_PREFIX}-header">
                 ${buildTabBar(sections, activeIndex, matchCountsPerTab)}
                 ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
+                ${showAppSelector ? buildSelectorBar(selectorValues, selectedApp) : ''}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
               <div class="${CSS_PREFIX}-viewer-inner">
@@ -519,6 +743,11 @@ function renderSection(element, opts) {
                 renderSection(element, { ...opts, fontSize: newSize });
             }
         });
+    }
+
+    // App selector event listeners
+    if (showAppSelector) {
+        attachAppSelectorListeners(element, opts);
     }
 
     // ── Search event listeners ──

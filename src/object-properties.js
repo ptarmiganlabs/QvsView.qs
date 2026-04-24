@@ -34,6 +34,7 @@ export default {
     toolbar: {
         showCopyButton: true,
         showFontSizeDropdown: false,
+        showAppSelector: false,
     },
     ai: {
         enabled: false,

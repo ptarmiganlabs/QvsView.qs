@@ -55,9 +55,9 @@ export function toolbarSection() {
                     { value: false, label: 'Off' },
                 ],
                 description:
-                    'Show a searchable dropdown in the toolbar that lists all values from the ' +
-                    'third dimension (script file selection). Selecting a value applies a ' +
-                    'selection in the data model. Requires the third dimension to be configured.',
+                    'Show a searchable dropdown (2nd toolbar row) listing all available ' +
+                    'values from Dim 3 (script source). Selecting a value applies a ' +
+                    'selection in the data model.',
             },
         },
     };
