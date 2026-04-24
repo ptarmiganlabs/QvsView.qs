@@ -57,15 +57,61 @@ export function estimateTokens(text) {
 }
 
 /**
+ * Send a simple "Hello, who are you?" test prompt to the configured AI provider.
+ * Used to verify connectivity and basic configuration from the property panel.
+ *
+ * @param {object} config - The full ai config from properties (properties.ai).
+ * @param {object} [options] - Additional options.
+ * @param {string} [options.apiKey] - API key (for OpenAI / Anthropic).
+ * @param {AbortSignal} [options.signal] - Optional AbortSignal to cancel the request.
+ *
+ * @returns {Promise<{content: string, model: string, provider: string}>}
+ *   The provider's response.
+ */
+export async function testConnection(config, options = {}) {
+    const provider = config.provider || 'ollama';
+    const systemPrompt = 'You are a helpful AI assistant.';
+    const userMessage = 'Hello! Who are you? Please respond with a brief introduction.';
+    const fetchOptions = { maxTokens: 256, signal: options.signal };
+
+    logger.info(`AI connection test: provider=${provider}`);
+
+    switch (provider) {
+        case 'ollama':
+            return callOllama(config.ollama || {}, systemPrompt, userMessage, fetchOptions);
+        case 'openai':
+            return callOpenAI(
+                config.openai || {},
+                systemPrompt,
+                userMessage,
+                options.apiKey,
+                fetchOptions
+            );
+        case 'anthropic':
+            return callAnthropic(
+                config.anthropic || {},
+                systemPrompt,
+                userMessage,
+                options.apiKey,
+                fetchOptions
+            );
+        default:
+            throw new Error(`Unknown AI provider: ${provider}`);
+    }
+}
+
+/**
  * Call Ollama's generate API.
  *
  * @param {object} cfg - Ollama config (endpoint, model).
  * @param {string} system - System prompt.
  * @param {string} prompt - User prompt with script.
+ * @param {object} [fetchOptions] - Additional fetch options.
+ * @param {AbortSignal} [fetchOptions.signal] - Optional AbortSignal to cancel the request.
  *
  * @returns {Promise<{content: string, model: string, provider: string}>} Analysis result.
  */
-async function callOllama(cfg, system, prompt) {
+async function callOllama(cfg, system, prompt, { signal } = {}) {
     const rawEndpoint = (cfg.endpoint || 'http://127.0.0.1:11434').replace(/\/+$/, '');
     // macOS resolves "localhost" to IPv6 (::1) but Ollama only listens on IPv4.
     // Only rewrite for plain HTTP — HTTPS endpoints are proxies that may bind to IPv6.
@@ -80,6 +126,7 @@ async function callOllama(cfg, system, prompt) {
         response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal,
             body: JSON.stringify({
                 model,
                 prompt,
@@ -143,10 +190,13 @@ function ollamaNetworkHint(endpoint, err) {
  * @param {string} system - System prompt.
  * @param {string} userMessage - User prompt with script.
  * @param {string} [apiKey] - API key.
+ * @param {object} [fetchOptions] - Additional fetch options.
+ * @param {number} [fetchOptions.maxTokens] - Optional token limit override.
+ * @param {AbortSignal} [fetchOptions.signal] - Optional AbortSignal to cancel the request.
  *
  * @returns {Promise<{content: string, model: string, provider: string}>} Analysis result.
  */
-async function callOpenAI(cfg, system, userMessage, apiKey) {
+async function callOpenAI(cfg, system, userMessage, apiKey, { maxTokens, signal } = {}) {
     const endpoint = (cfg.endpoint || 'https://api.openai.com/v1').replace(/\/+$/, '');
     const model = cfg.model || 'gpt-4o';
 
@@ -161,19 +211,23 @@ async function callOpenAI(cfg, system, userMessage, apiKey) {
         Authorization: `Bearer ${apiKey}`,
     };
 
+    const requestBody = {
+        model,
+        messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: userMessage },
+        ],
+        stream: false,
+    };
+    if (maxTokens !== undefined) requestBody.max_tokens = maxTokens;
+
     let response;
     try {
         response = await fetch(`${endpoint}/chat/completions`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: system },
-                    { role: 'user', content: userMessage },
-                ],
-                stream: false,
-            }),
+            signal,
+            body: JSON.stringify(requestBody),
         });
     } catch (err) {
         throw new Error(
@@ -203,10 +257,13 @@ async function callOpenAI(cfg, system, userMessage, apiKey) {
  * @param {string} system - System prompt.
  * @param {string} userMessage - User prompt with script.
  * @param {string} [apiKey] - API key.
+ * @param {object} [fetchOptions] - Additional fetch options.
+ * @param {number} [fetchOptions.maxTokens] - Token limit (defaults to 8192).
+ * @param {AbortSignal} [fetchOptions.signal] - Optional AbortSignal to cancel the request.
  *
  * @returns {Promise<{content: string, model: string, provider: string}>} Analysis result.
  */
-async function callAnthropic(cfg, system, userMessage, apiKey) {
+async function callAnthropic(cfg, system, userMessage, apiKey, { maxTokens = 8192, signal } = {}) {
     const endpoint = (cfg.endpoint || 'https://api.anthropic.com/v1').replace(/\/+$/, '');
     const model = cfg.model || 'claude-sonnet-4-20250514';
 
@@ -220,6 +277,8 @@ async function callAnthropic(cfg, system, userMessage, apiKey) {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        // Required for direct browser fetch — Anthropic rejects preflight without this
+        'anthropic-dangerous-direct-browser-access': 'true',
     };
 
     let response;
@@ -227,9 +286,10 @@ async function callAnthropic(cfg, system, userMessage, apiKey) {
         response = await fetch(`${endpoint}/messages`, {
             method: 'POST',
             headers,
+            signal,
             body: JSON.stringify({
                 model,
-                max_tokens: 8192,
+                max_tokens: maxTokens,
                 system,
                 messages: [{ role: 'user', content: userMessage }],
             }),

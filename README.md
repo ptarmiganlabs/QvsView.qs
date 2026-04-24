@@ -57,10 +57,10 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 
 Each release includes two variants of the extension:
 
-| Release file                       | Description                                                                          | When to use                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------- |
-| `qvsview-qs-v{VERSION}-cdn.zip`    | **CDN variant** — Mermaid.js loaded from jsDelivr at runtime. Small bundle (~40 KB). | Environments with internet access             |
-| `qvsview-qs-v{VERSION}-airgap.zip` | **Air-gapped variant** — Mermaid.js bundled in the extension. Larger bundle (~3 MB). | Air-gapped or network-restricted environments |
+| Release file                       | Description                                                                            | When to use                                   |
+| ---------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `qvsview-qs-v{VERSION}-cdn.zip`    | **CDN variant** — Mermaid.js loaded from jsDelivr at runtime. Small bundle (~57 KB).   | Environments with internet access             |
+| `qvsview-qs-v{VERSION}-airgap.zip` | **Air-gapped variant** — Mermaid.js bundled in the extension. Larger bundle (~910 KB). | Air-gapped or network-restricted environments |
 
 1. Go to [**Releases**](https://github.com/ptarmiganlabs/QvsView.qs/releases) and download the variant that matches your environment.
 2. Extract the downloaded ZIP. Inside you will find:
@@ -135,7 +135,7 @@ Endpoints and LLM models can be customized in the property panel, allowing use o
 ### Setup
 
 1. Enable **AI Analysis** in the property panel under _AI Analysis → Enable AI Analysis_.
-2. Choose a **provider** and configure the endpoint, model, and API key mode:
+2. Choose a **provider** and configure the endpoint, model (either choose from **Available models** or type directly into **Model**), and API key mode:
     - **Stored** — key saved in the Qlik object properties (convenient but visible to anyone with object access).
     - **Prompt at runtime** — key requested when you click Analyze and cached for the browser session.
 3. Optionally set **Analysis scope** (current section or full script) and a **Custom system prompt**.
