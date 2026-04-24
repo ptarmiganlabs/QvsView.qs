@@ -290,7 +290,10 @@ function attachAppSelectorListeners(element, opts) {
     input.addEventListener('input', () => {
         filterOptions(input.value);
         if (clearBtn) {
-            clearBtn.style.display = input.value ? '' : 'none';
+            // Keep ✕ visible if a selection is active so users can clear it even after
+            // manually erasing the input text (otherwise the field selection would be
+            // stuck with no in-widget way to cancel it).
+            clearBtn.style.display = input.value || opts.selectedApp ? '' : 'none';
         }
     });
 
@@ -302,7 +305,7 @@ function attachAppSelectorListeners(element, opts) {
             input.blur();
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            // allOptions is a live NodeList — search it directly without converting to array
+            // allOptions is a static NodeList (querySelectorAll); search it via Array helpers
             const firstVisible = Array.prototype.find.call(
                 allOptions,
                 (opt) => opt.style.display !== 'none'
