@@ -587,6 +587,52 @@ export function renderViewer(element, options) {
 }
 
 /**
+ * Render an empty-state viewer shell that keeps the script source selector usable.
+ *
+ * Used when the object is configured correctly but no single script source is
+ * currently selected, so the user still needs access to the selector dropdown.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {object} options - Empty-state render options.
+ * @param {string} options.message - Empty-state message to display in the viewer area.
+ * @param {boolean} [options.showAppSelector] - Whether to render the selector row.
+ * @param {string[]} [options.selectorValues] - Available values for the selector dropdown.
+ * @param {string|null} [options.selectedApp] - Currently selected value, or null.
+ * @param {((value: string|null) => void)|null} [options.onAppSelect] - Callback when a value is selected or cleared.
+ *
+ * @returns {void}
+ */
+export function renderViewerEmptyState(element, options) {
+    injectCSS();
+
+    const {
+        message,
+        showAppSelector = false,
+        selectorValues = [],
+        selectedApp = null,
+        onAppSelect = null,
+    } = options;
+
+    element.innerHTML = `
+        <div class="${CSS_PREFIX}-container" tabindex="0">
+            <div class="${CSS_PREFIX}-header">
+                ${showAppSelector ? buildSelectorBar(selectorValues, selectedApp) : ''}
+            </div>
+            <div class="${CSS_PREFIX}-viewer">
+                <div class="${CSS_PREFIX}-placeholder">
+                    <div class="${CSS_PREFIX}-placeholder-icon">&#60;/&#62;</div>
+                    <div class="${CSS_PREFIX}-placeholder-text">${escapeHTML(message)}</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (showAppSelector) {
+        attachAppSelectorListeners(element, { selectedApp, onAppSelect });
+    }
+}
+
+/**
  * Render a specific section with its tab bar, toolbar, and code.
  *
  * @param {HTMLElement} element - The extension's root DOM element.

@@ -21,7 +21,13 @@ import {
 import ext from './ext/index.js';
 import data from './data.js';
 import definition from './object-properties.js';
-import { renderViewer, renderPlaceholder, renderLoading, renderWarning } from './ui/viewer.js';
+import {
+    renderViewer,
+    renderViewerEmptyState,
+    renderPlaceholder,
+    renderLoading,
+    renderWarning,
+} from './ui/viewer.js';
 import { applyRuntimeBnf, resetToStaticBnf } from './syntax/keywords.js';
 import { fetchRuntimeBnf, clearBnfCache } from './syntax/bnf-loader.js';
 import logger, { PACKAGE_VERSION, BUILD_DATE } from './util/logger.js';
@@ -193,28 +199,6 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // Multi-app warning: multiple distinct sources after selections
-                if (activeIds && activeIds.length > 1) {
-                    const viewerOpts = layout.viewer || {};
-                    const message =
-                        viewerOpts.multiAppWarningMessage ||
-                        'Multiple scripts detected. Use a filter to select a single script source.';
-                    renderWarning(element, message, activeIds);
-                    return;
-                }
-
-                // Filter raw rows by the active identifier when second dim is present
-                let filteredRows = rawRows;
-                if (activeIds && activeIds.length === 1) {
-                    filteredRows = rawRows.filter((r) => r.id === activeIds[0]);
-                }
-
-                const script = filteredRows.map((r) => r.text).join('\n');
-                if (!script) {
-                    renderPlaceholder(element);
-                    return;
-                }
-
                 const viewerOpts = layout.viewer || {};
                 const toolbarOpts = layout.toolbar || {};
                 const aiOpts = layout.ai || {};
@@ -231,6 +215,64 @@ export default function supernova(_galaxy) {
                 const selectedApp =
                     showAppSelector && activeIds && activeIds.length === 1 ? activeIds[0] : null;
 
+                /**
+                 * Apply or clear the script source selection from the viewer selector.
+                 *
+                 * @param {string|null} value - Selected source value, or null to clear the selection.
+                 *
+                 * @returns {void}
+                 */
+                const onSelectorChange = (value) => {
+                    handleAppSelect(app, layout, value);
+                };
+
+                // Multi-app warning: multiple distinct sources after selections.
+                // When the selector is enabled, keep the widget usable so the user can
+                // still pick a single script source directly from the toolbar row.
+                if (activeIds && activeIds.length > 1) {
+                    if (showAppSelector) {
+                        renderViewerEmptyState(element, {
+                            message: 'Select a script source to view its script.',
+                            showAppSelector,
+                            selectorValues,
+                            selectedApp: null,
+                            onAppSelect: onSelectorChange,
+                        });
+                        return;
+                    }
+
+                    const message =
+                        viewerOpts.multiAppWarningMessage ||
+                        'Multiple scripts detected. Use a filter to select a single script source.';
+                    renderWarning(element, message, activeIds);
+                    return;
+                }
+
+                // Filter raw rows by the active identifier when second dim is present
+                let filteredRows = rawRows;
+                if (activeIds && activeIds.length === 1) {
+                    filteredRows = rawRows.filter((r) => r.id === activeIds[0]);
+                }
+
+                const script = filteredRows.map((r) => r.text).join('\n');
+                if (!script) {
+                    if (showAppSelector) {
+                        renderViewerEmptyState(element, {
+                            message: selectedApp
+                                ? 'No script lines found for the selected script source.'
+                                : 'Select a script source to view its script.',
+                            showAppSelector,
+                            selectorValues,
+                            selectedApp,
+                            onAppSelect: onSelectorChange,
+                        });
+                        return;
+                    }
+
+                    renderPlaceholder(element);
+                    return;
+                }
+
                 renderViewer(element, {
                     script,
                     showLineNumbers: viewerOpts.showLineNumbers !== false,
@@ -243,9 +285,7 @@ export default function supernova(_galaxy) {
                     showAppSelector,
                     selectorValues,
                     selectedApp,
-                    onAppSelect: showAppSelector
-                        ? (value) => handleAppSelect(app, layout, value)
-                        : null,
+                    onAppSelect: showAppSelector ? onSelectorChange : null,
                     showAiAnalysis: aiEnabled,
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
