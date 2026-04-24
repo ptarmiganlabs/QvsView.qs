@@ -281,10 +281,9 @@ function attachAppSelectorListeners(element, opts) {
         dropdown.style.display = anyVisible ? '' : 'none';
     }
 
-    // Show dropdown on focus
+    // Show matching options on focus; `filterOptions()` also controls dropdown visibility.
     input.addEventListener('focus', () => {
         filterOptions(input.value);
-        dropdown.style.display = '';
     });
 
     // Real-time filtering as the user types
