@@ -208,6 +208,7 @@ function buildAppSelectorHTML(values, selectedValue) {
     const optionItems = values
         .map(
             (v) =>
+                // escapeAttr for the data-value attribute context; escapeHTML for text content
                 `<div class="${CSS_PREFIX}-appselector-option${v === selectedValue ? ` ${CSS_PREFIX}-appselector-option-selected` : ''}" data-value="${escapeAttr(v)}">${escapeHTML(v)}</div>`
         )
         .join('');
@@ -302,7 +303,11 @@ function attachAppSelectorListeners(element, opts) {
             input.blur();
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            const firstVisible = Array.from(allOptions).find((opt) => opt.style.display !== 'none');
+            // allOptions is a live NodeList — search it directly without converting to array
+            const firstVisible = Array.prototype.find.call(
+                allOptions,
+                (opt) => opt.style.display !== 'none'
+            );
             if (firstVisible) {
                 const value = firstVisible.dataset.value;
                 input.value = value;
@@ -360,14 +365,18 @@ function attachAppSelectorListeners(element, opts) {
     };
     document.addEventListener('mousedown', onOutsideClick);
 
-    // Remove the document listener when the wrapper is detached (innerHTML replaced on re-render)
+    // Remove the document listener when the wrapper is detached (innerHTML replaced on re-render).
+    // Observe the wrapper's parent — the selector bar — to only fire when this direct child
+    // is removed, rather than observing all descendant changes under element.
+    const selectorBar = wrapper.parentElement;
+    const observeTarget = selectorBar || element;
     const observer = new MutationObserver(() => {
         if (!document.contains(wrapper)) {
             document.removeEventListener('mousedown', onOutsideClick);
             observer.disconnect();
         }
     });
-    observer.observe(element, { childList: true });
+    observer.observe(observeTarget, { childList: true });
 }
 
 /**
