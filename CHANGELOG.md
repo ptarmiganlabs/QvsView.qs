@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.6.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.5.0...qvsview-qs-v0.6.0) (2026-04-24)
+
+
+### Features
+
+* add AI connection test button to property panel ([df70cf7](https://github.com/ptarmiganlabs/QvsView.qs/commit/df70cf748cd972dff7d2d080fc3faab872af891a))
+* cross-tab search navigation with tab match indicators ([890e7ad](https://github.com/ptarmiganlabs/QvsView.qs/commit/890e7ad1d0edb8ff30d48cf28b89113ee667cb30))
+
+
+### Bug Fixes
+
+* address review feedback on AI test modal and provider calls ([79bcc83](https://github.com/ptarmiganlabs/QvsView.qs/commit/79bcc83f3e5cecc400214440fdba0ddf6d7a73fe))
+* correct search highlight positions when script contains empty lines ([2929a4b](https://github.com/ptarmiganlabs/QvsView.qs/commit/2929a4b850fd5e3442c27b57f1b36da514dbee07))
+* prevent search input text selection after automatic tab switch ([07c42ca](https://github.com/ptarmiganlabs/QvsView.qs/commit/07c42caeaf85f6be30502d5b98a2357943298ed7))
+* update tab bar pill badges during live-typing search path ([9882f09](https://github.com/ptarmiganlabs/QvsView.qs/commit/9882f09df821e8d50a0301ecc0c8ca664aefc4c8))
+
+
+### Refactoring
+
+* address code review - avoid redundant findMatchOffsets, combine destructuring ([52149c8](https://github.com/ptarmiganlabs/QvsView.qs/commit/52149c8d65797845d0e1d6c67383ad65b5df86e9))
+
 ## [0.5.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.4.0...qvsview-qs-v0.5.0) (2026-04-23)
 
 ### Features
