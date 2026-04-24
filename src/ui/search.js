@@ -155,14 +155,22 @@ export function highlightMatches(html, plainText, matches, activeIndex) {
 /**
  * Scroll the viewer to make the active match visible.
  *
+ * When a match starts exactly at a line boundary the injector may produce
+ * an empty boundary `<mark>` element (no text content) just before the
+ * actual line div.  We skip those and scroll to the first mark element
+ * that actually contains text.
+ *
  * @param {HTMLElement} container - The `.qvs-viewer` scroll container.
  * @param {number} matchIndex - Index of the match to scroll to.
  *
  * @returns {void}
  */
 export function scrollToMatch(container, matchIndex) {
-    const mark = container.querySelector(`mark[data-match-index="${matchIndex}"]`);
-    if (!mark) return;
+    const marks = container.querySelectorAll(`mark[data-match-index="${matchIndex}"]`);
+    if (!marks.length) return;
+
+    // Prefer the first mark that has visible text content; fall back to the first one.
+    const mark = Array.from(marks).find((m) => m.textContent !== '') ?? marks[0];
 
     mark.scrollIntoView({ block: 'center', inline: 'nearest' });
 }

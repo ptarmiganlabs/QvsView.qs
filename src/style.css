@@ -59,6 +59,20 @@
     font-weight: 600;
 }
 
+/* ── Tab match count badge (shown during search) ── */
+.qvs-tab-match-count {
+    display: inline-block;
+    margin-left: 5px;
+    padding: 0 5px;
+    border-radius: 8px;
+    background: #4a90d9;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.6;
+    vertical-align: middle;
+}
+
 /* ── Toolbar ── */
 .qvs-toolbar {
     display: flex;
