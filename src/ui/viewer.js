@@ -55,6 +55,60 @@ function buildTabBar(sections, activeIndex, matchCounts = null) {
 }
 
 /**
+ * Build a live DOM element for the tab bar, ready to insert into the document.
+ *
+ * @param {import('../sections.js').ScriptSection[]} sections - All script sections.
+ * @param {number} activeIndex - Index of the active section.
+ * @param {number[]|null} matchCounts - Per-tab match counts (null = no indicators).
+ *
+ * @returns {Element} The tab-bar `<div>` DOM element.
+ */
+function createTabBarElement(sections, activeIndex, matchCounts) {
+    const tmp = document.createElement('div');
+    // Safe: buildTabBar escapes all user-supplied text (section names) via escapeHTML.
+    tmp.innerHTML = buildTabBar(sections, activeIndex, matchCounts);
+    return tmp.firstElementChild;
+}
+
+/**
+ * Attach click handlers to all tab buttons inside the element.
+ *
+ * Reads the current search query from `element.dataset` at click-time so the
+ * handler is always in sync even if called after a tab-bar replacement.
+ *
+ * @param {HTMLElement} element - The extension's root DOM element.
+ * @param {number} activeIndex - Index of the currently displayed section.
+ * @param {object} opts - Current render options passed to renderSection.
+ *   Expected properties: sections, activeIndex, lineNumbers, wrapLines,
+ *   fontSize, showCopyButton, showFontSizeDropdown, showSearch, showAiAnalysis.
+ * @param {import('../sections.js').ScriptSection[]} sections - All script sections.
+ *
+ * @returns {void}
+ */
+function attachTabClickHandlers(element, activeIndex, opts, sections) {
+    element.querySelectorAll(`.${CSS_PREFIX}-tab`).forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.dataset.sectionIndex, 10);
+            if (idx === activeIndex) return;
+
+            // If search is active, preserve the global match index by jumping to
+            // the first match in the clicked section (or the overall first match).
+            const query = element.dataset.qvsSearchQuery || '';
+            if (query) {
+                // Recompute global matches at click-time (query may have changed since render)
+                const allMatches = findAllMatches(sections, query);
+                const firstInSection = allMatches.findIndex((m) => m.sectionIndex === idx);
+                element.dataset.qvsSearchMatch = String(firstInSection >= 0 ? firstInSection : 0);
+            } else {
+                element.dataset.qvsSearchMatch = '0';
+            }
+            element.dataset.qvsFoldState = '';
+            renderSection(element, { ...opts, activeIndex: idx });
+        });
+    });
+}
+
+/**
  * Find all search matches across all sections in order.
  *
  * Returns a flat array where matches in section 0 come first, followed by
@@ -386,26 +440,7 @@ function renderSection(element, opts) {
     // ── Attach event listeners ──
 
     // Tab click handler
-    element.querySelectorAll(`.${CSS_PREFIX}-tab`).forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            const idx = parseInt(e.currentTarget.dataset.sectionIndex, 10);
-            if (idx === activeIndex) return;
-
-            // If search is active, preserve the global match index by jumping to
-            // the first match in the clicked section (or the overall first match).
-            const query = element.dataset.qvsSearchQuery || '';
-            if (query) {
-                // Recompute global matches at click-time (query may have changed since render)
-                const allMatches = findAllMatches(sections, query);
-                const firstInSection = allMatches.findIndex((m) => m.sectionIndex === idx);
-                element.dataset.qvsSearchMatch = String(firstInSection >= 0 ? firstInSection : 0);
-            } else {
-                element.dataset.qvsSearchMatch = '0';
-            }
-            element.dataset.qvsFoldState = '';
-            renderSection(element, { ...opts, activeIndex: idx });
-        });
-    });
+    attachTabClickHandlers(element, activeIndex, opts, sections);
 
     // Fold gutter click handler (event delegation)
     if (enableFolding) {
@@ -641,6 +676,19 @@ function updateCodeHighlights(element, opts) {
     const nextBtn = element.querySelector(`.${CSS_PREFIX}-search-next`);
     if (prevBtn) prevBtn.disabled = totalMatches <= 0;
     if (nextBtn) nextBtn.disabled = totalMatches <= 0;
+
+    // Update tab bar — rebuild per-tab match counts and replace tab bar HTML in-place
+    const tabBar = element.querySelector(`.${CSS_PREFIX}-tab-bar`);
+    if (tabBar) {
+        const matchCountsPerTab = new Array(opts.sections.length).fill(0);
+        for (const m of globalMatches) {
+            matchCountsPerTab[m.sectionIndex]++;
+        }
+        const newTabBar = createTabBarElement(opts.sections, activeIndex, matchCountsPerTab);
+        tabBar.parentElement.replaceChild(newTabBar, tabBar);
+        // Re-attach tab click handlers on the freshly replaced tab bar
+        attachTabClickHandlers(element, activeIndex, opts, opts.sections);
+    }
 
     // Scroll to first match
     if (sectionMatches.length > 0) {
