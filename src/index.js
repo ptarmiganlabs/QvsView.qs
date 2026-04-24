@@ -71,6 +71,13 @@ export default function supernova(_galaxy) {
             const [activeIds, setActiveIds] = useState(null);
             const [bnfReady, setBnfReady] = useState(false);
 
+            /**
+             * All available source field values, fetched via the Field API
+             * so they are visible regardless of the current hypercube selection.
+             * Used to populate the script source selector dropdown.
+             */
+            const [allSourceValues, setAllSourceValues] = useState([]);
+
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
             }, []);
@@ -94,6 +101,27 @@ export default function supernova(_galaxy) {
                     setBnfReady(true);
                 }
             }, [layout?.viewer?.useRuntimeBnf]);
+
+            // Fetch ALL source field values via the Field API (bypasses current selections)
+            // so the selector dropdown always shows the complete list.
+            useEffect(() => {
+                if (!app || !layout) return;
+                const showSelector = layout.toolbar?.showAppSelector === true;
+                if (!showSelector) {
+                    setAllSourceValues([]);
+                    return;
+                }
+                const fieldName = getSourceFieldName(layout);
+                if (!fieldName) {
+                    setAllSourceValues([]);
+                    return;
+                }
+                fetchAllFieldValues(app, fieldName).then(setAllSourceValues);
+            }, [
+                app,
+                layout?.qHyperCube?.qDimensionInfo?.[2]?.qGroupFieldDefs?.[0],
+                layout?.toolbar?.showAppSelector,
+            ]);
 
             // Fetch raw row data via the hypercube (row number dimension prevents deduplication)
             useEffect(() => {
@@ -195,12 +223,9 @@ export default function supernova(_galaxy) {
                 // App selector: show when enabled AND Dim 3 is configured
                 const showAppSelector = toolbarOpts.showAppSelector === true;
 
-                // Derive distinct selector values from rawRows (Dim 3 = script source)
-                const selectorValues = showAppSelector
-                    ? [...new Set(rawRows.map((r) => r.id).filter(Boolean))].sort((a, b) =>
-                          a.localeCompare(b)
-                      )
-                    : [];
+                // Use all field values fetched via the Field API (ignores current selections)
+                // so the dropdown always shows every available script source.
+                const selectorValues = showAppSelector ? allSourceValues : [];
 
                 // Determine selected app: exactly one source active means a selection is set
                 const selectedApp =
@@ -225,7 +250,7 @@ export default function supernova(_galaxy) {
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
-            }, [layout, element, rawRows, activeIds, bnfReady]);
+            }, [layout, element, rawRows, activeIds, bnfReady, allSourceValues]);
         },
     };
 }
@@ -533,6 +558,46 @@ function getSourceFieldName(layout) {
     fieldName = fieldName.replace(/^=/, '').replace(/^\[|\]$/g, '');
 
     return fieldName || null;
+}
+
+/**
+ * Fetch ALL distinct values for a field via the Qlik Field API.
+ *
+ * Unlike reading from the hypercube (which only returns rows matching
+ * current selections), `field.getData()` returns every value in the field
+ * regardless of selection state — making it the correct source for populating
+ * the script source selector dropdown.
+ *
+ * @param {object} app - Qlik Doc API (from useApp hook).
+ * @param {string} fieldName - The field name to query.
+ *
+ * @returns {Promise<string[]>} Sorted, deduplicated list of all field values.
+ */
+async function fetchAllFieldValues(app, fieldName) {
+    if (!app || !fieldName) return [];
+
+    try {
+        const field = await app.getField(fieldName);
+        if (!field) return [];
+
+        // getData returns all field values (selected, optional, excluded) in pages
+        const dataPages = await field.getData([{ qTop: 0, qLeft: 0, qWidth: 1, qHeight: 10000 }]);
+
+        const values = [];
+        for (const page of dataPages || []) {
+            for (const row of page.qMatrix || []) {
+                const text = row[0]?.qText;
+                if (text != null && text !== '') {
+                    values.push(text);
+                }
+            }
+        }
+
+        return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+    } catch (err) {
+        logger.warn('fetchAllFieldValues: Field API call failed:', err);
+        return [];
+    }
 }
 
 /**

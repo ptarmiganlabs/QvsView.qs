@@ -645,8 +645,10 @@ function renderSection(element, opts) {
     element.innerHTML = `
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
-                ${buildTabBar(sections, activeIndex, matchCountsPerTab)}
-                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
+                <div class="${CSS_PREFIX}-header-row">
+                    ${buildTabBar(sections, activeIndex, matchCountsPerTab)}
+                    ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
+                </div>
                 ${showAppSelector ? buildSelectorBar(selectorValues, selectedApp) : ''}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">

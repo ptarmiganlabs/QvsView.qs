@@ -10,16 +10,22 @@
     overflow: hidden;
 }
 
-/* ── Header (tab bar + toolbar) ── */
+/* ── Header (tab bar + toolbar rows) ── */
 .qvs-header {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     flex-shrink: 0;
     background: #f0f0f0;
     border-bottom: 1px solid #ddd;
     min-height: 0;
+}
+
+/* ── First header row: tab bar + toolbar ── */
+.qvs-header-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
 }
 
 /* ── Tab bar ── */
