@@ -365,17 +365,15 @@ function attachAppSelectorListeners(element, opts) {
     document.addEventListener('mousedown', onOutsideClick);
 
     // Remove the document listener when the wrapper is detached (innerHTML replaced on re-render).
-    // Observe the wrapper's parent — the selector bar — to only fire when this direct child
-    // is removed, rather than observing all descendant changes under element.
-    const selectorBar = wrapper.parentElement;
-    const observeTarget = selectorBar || element;
+    // Observe the stable root element so subtree replacement is detected even when the entire
+    // selector bar is removed without mutating its own childList.
     const observer = new MutationObserver(() => {
         if (!document.contains(wrapper)) {
             document.removeEventListener('mousedown', onOutsideClick);
             observer.disconnect();
         }
     });
-    observer.observe(observeTarget, { childList: true });
+    observer.observe(element, { childList: true, subtree: true });
 }
 
 /**
