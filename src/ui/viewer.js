@@ -523,8 +523,12 @@ function renderSection(element, opts) {
     // Search input and button handlers (only when search bar is visible)
     const searchInput = element.querySelector(`.${CSS_PREFIX}-search-input`);
     if (searchInput) {
-        // Focus the input on initial open
+        // Focus the input.  Place the caret at the end of any pre-filled text so
+        // that a programmatic focus after a tab-switch does not select-all the
+        // query (which would cause the next keystroke to erase it).
         searchInput.focus();
+        const inputLen = searchInput.value.length;
+        searchInput.setSelectionRange(inputLen, inputLen);
 
         // Live search on input — update highlights without replacing search bar
         let debounceTimer = null;
