@@ -209,17 +209,18 @@ function buildAppSelectorHTML(values, selectedValue) {
         .map(
             (v) =>
                 // escapeAttr for the data-value attribute context; escapeHTML for text content
-                `<div class="${CSS_PREFIX}-appselector-option${v === selectedValue ? ` ${CSS_PREFIX}-appselector-option-selected` : ''}" data-value="${escapeAttr(v)}">${escapeHTML(v)}</div>`
+                `<div class="${CSS_PREFIX}-appselector-option${v === selectedValue ? ` ${CSS_PREFIX}-appselector-option-selected` : ''}" data-value="${escapeAttr(v)}" tabindex="-1">${escapeHTML(v)}</div>`
         )
         .join('');
 
     return `<div class="${CSS_PREFIX}-appselector">
         <div class="${CSS_PREFIX}-appselector-input-wrap">
             <input class="${CSS_PREFIX}-appselector-input" type="text"
-                   placeholder="${escapeAttr(placeholder)}" value="${escapeAttr(displayText)}"
-                   spellcheck="false" autocomplete="off"
-                   title="Script source selection" />
+                    placeholder="${escapeAttr(placeholder)}" value="${escapeAttr(displayText)}"
+                    spellcheck="false" autocomplete="off"
+                    title="Script source selection" />
             <button class="${CSS_PREFIX}-appselector-clear" title="Clear selection"${clearBtnStyle}>&#10005;</button>
+            <button class="${CSS_PREFIX}-appselector-toggle" aria-label="Show script sources" aria-expanded="false">&#9662;</button>
         </div>
         <div class="${CSS_PREFIX}-appselector-dropdown" style="display:none">
             ${optionItems}
@@ -260,14 +261,58 @@ function attachAppSelectorListeners(element, opts) {
     const input = wrapper.querySelector(`.${CSS_PREFIX}-appselector-input`);
     const dropdown = wrapper.querySelector(`.${CSS_PREFIX}-appselector-dropdown`);
     const clearBtn = wrapper.querySelector(`.${CSS_PREFIX}-appselector-clear`);
+    const toggleBtn = wrapper.querySelector(`.${CSS_PREFIX}-appselector-toggle`);
     if (!input || !dropdown) return;
 
     const allOptions = dropdown.querySelectorAll(`.${CSS_PREFIX}-appselector-option`);
+    const selectedValue = opts.selectedApp || '';
+    let isOpen = false;
+
+    /**
+     * Sync dropdown/toggle UI based on open state and visible matches.
+     *
+     * @param {boolean} anyVisible - Whether at least one option is visible.
+     *
+     * @returns {void}
+     */
+    function syncDropdownVisibility(anyVisible) {
+        dropdown.style.display = isOpen && anyVisible ? '' : 'none';
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            toggleBtn.classList.toggle(
+                `${CSS_PREFIX}-appselector-toggle-open`,
+                isOpen && anyVisible
+            );
+        }
+    }
+
+    /**
+     * Get all currently visible options.
+     *
+     * @returns {HTMLElement[]} Visible option elements.
+     */
+    function getVisibleOptions() {
+        return Array.prototype.filter.call(allOptions, (opt) => opt.style.display !== 'none');
+    }
+
+    /**
+     * Focus the first currently visible option, if any.
+     *
+     * @returns {void}
+     */
+    function focusFirstVisibleOption() {
+        const [firstVisible] = getVisibleOptions();
+        if (firstVisible) {
+            firstVisible.focus();
+        }
+    }
 
     /**
      * Show/hide dropdown options based on the current filter text.
      *
      * @param {string} filter - Filter text (case-insensitive).
+     *
+     * @returns {boolean} Whether any options matched the filter.
      */
     function filterOptions(filter) {
         const lowerFilter = filter.toLowerCase();
@@ -278,31 +323,72 @@ function attachAppSelectorListeners(element, opts) {
             opt.style.display = match ? '' : 'none';
             if (match) anyVisible = true;
         });
-        dropdown.style.display = anyVisible ? '' : 'none';
+        syncDropdownVisibility(anyVisible);
+        return anyVisible;
+    }
+
+    /**
+     * Open the dropdown and render options for the given filter text.
+     *
+     * @param {string} filter - Filter text to apply.
+     *
+     * @returns {void}
+     */
+    function openDropdown(filter) {
+        isOpen = true;
+        filterOptions(filter);
+    }
+
+    /**
+     * Close the dropdown list.
+     *
+     * @returns {void}
+     */
+    function closeDropdown() {
+        isOpen = false;
+        syncDropdownVisibility(false);
+    }
+
+    /**
+     * Show or hide the clear button based on the current input/selection state.
+     *
+     * @param {string|null} [selectionValue] - Effective selected value.
+     *
+     * @returns {void}
+     */
+    function updateClearButtonVisibility(selectionValue = opts.selectedApp) {
+        if (clearBtn) {
+            clearBtn.style.display = input.value || selectionValue ? '' : 'none';
+        }
     }
 
     // Show matching options on focus; `filterOptions()` also controls dropdown visibility.
     input.addEventListener('focus', () => {
-        filterOptions(input.value);
+        if (input.value === selectedValue && selectedValue) {
+            input.select();
+        }
+        openDropdown(input.value === selectedValue ? '' : input.value);
     });
 
     // Real-time filtering as the user types
     input.addEventListener('input', () => {
-        filterOptions(input.value);
-        if (clearBtn) {
-            // Keep ✕ visible if a selection is active so users can clear it even after
-            // manually erasing the input text (otherwise the field selection would be
-            // stuck with no in-widget way to cancel it).
-            clearBtn.style.display = input.value || opts.selectedApp ? '' : 'none';
-        }
+        openDropdown(input.value);
+        // Keep ✕ visible if a selection is active so users can clear it even after
+        // manually erasing the input text (otherwise the field selection would be
+        // stuck with no in-widget way to cancel it).
+        updateClearButtonVisibility();
     });
 
     // Keyboard: Enter selects first visible option, Escape closes
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
-            dropdown.style.display = 'none';
+            closeDropdown();
             input.blur();
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            openDropdown(input.value === selectedValue ? '' : input.value);
+            focusFirstVisibleOption();
         } else if (e.key === 'Enter') {
             e.preventDefault();
             // allOptions is a static NodeList (querySelectorAll); search it via Array helpers
@@ -313,7 +399,8 @@ function attachAppSelectorListeners(element, opts) {
             if (firstVisible) {
                 const value = firstVisible.dataset.value;
                 input.value = value;
-                dropdown.style.display = 'none';
+                closeDropdown();
+                updateClearButtonVisibility();
                 if (typeof opts.onAppSelect === 'function') {
                     opts.onAppSelect(value);
                 }
@@ -321,14 +408,54 @@ function attachAppSelectorListeners(element, opts) {
         }
     });
 
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', (evt) => {
+            evt.preventDefault();
+            if (isOpen) {
+                closeDropdown();
+            } else {
+                openDropdown('');
+                input.focus();
+            }
+        });
+    }
+
     // Option click handler
     allOptions.forEach((opt) => {
         opt.addEventListener('click', () => {
             const value = opt.dataset.value;
             input.value = value;
-            dropdown.style.display = 'none';
+            closeDropdown();
+            updateClearButtonVisibility();
             if (typeof opts.onAppSelect === 'function') {
                 opts.onAppSelect(value);
+            }
+        });
+        opt.addEventListener('keydown', (evt) => {
+            const visibleOptions = getVisibleOptions();
+            const currentIndex = visibleOptions.indexOf(opt);
+
+            if (
+                evt.key === 'ArrowDown' &&
+                currentIndex >= 0 &&
+                currentIndex < visibleOptions.length - 1
+            ) {
+                evt.preventDefault();
+                visibleOptions[currentIndex + 1].focus();
+            } else if (evt.key === 'ArrowUp') {
+                evt.preventDefault();
+                if (currentIndex > 0) {
+                    visibleOptions[currentIndex - 1].focus();
+                } else {
+                    input.focus();
+                }
+            } else if (evt.key === 'Enter' || evt.key === ' ') {
+                evt.preventDefault();
+                opt.click();
+            } else if (evt.key === 'Escape') {
+                evt.preventDefault();
+                closeDropdown();
+                input.focus();
             }
         });
     });
@@ -337,8 +464,8 @@ function attachAppSelectorListeners(element, opts) {
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
             input.value = '';
-            clearBtn.style.display = 'none';
-            dropdown.style.display = 'none';
+            updateClearButtonVisibility(null);
+            closeDropdown();
             if (typeof opts.onAppSelect === 'function') {
                 opts.onAppSelect(null);
             }
@@ -349,7 +476,7 @@ function attachAppSelectorListeners(element, opts) {
     wrapper.addEventListener('focusout', () => {
         setTimeout(() => {
             if (!wrapper.contains(document.activeElement)) {
-                dropdown.style.display = 'none';
+                closeDropdown();
             }
         }, DROPDOWN_BLUR_DELAY_MS);
     });
@@ -362,7 +489,7 @@ function attachAppSelectorListeners(element, opts) {
      */
     const onOutsideClick = (evt) => {
         if (!wrapper.contains(evt.target)) {
-            dropdown.style.display = 'none';
+            closeDropdown();
         }
     };
     document.addEventListener('mousedown', onOutsideClick);

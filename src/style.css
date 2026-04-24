@@ -342,7 +342,7 @@
 .qvs-appselector-input {
     width: 100%;
     min-width: 180px;
-    padding: 3px 22px 3px 6px;
+    padding: 3px 38px 3px 6px;
     border: 1px solid #ccc;
     border-radius: 3px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -360,7 +360,7 @@
 
 .qvs-appselector-clear {
     position: absolute;
-    right: 3px;
+    right: 20px;
     padding: 0 3px;
     border: none;
     background: transparent;
@@ -372,6 +372,29 @@
 
 .qvs-appselector-clear:hover {
     color: #333;
+}
+
+.qvs-appselector-toggle {
+    position: absolute;
+    right: 2px;
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    font-size: 10px;
+    color: #777;
+    cursor: pointer;
+    line-height: 1;
+    transition:
+        color 0.15s,
+        transform 0.15s;
+}
+
+.qvs-appselector-toggle:hover {
+    color: #333;
+}
+
+.qvs-appselector-toggle-open {
+    transform: rotate(180deg);
 }
 
 .qvs-appselector-dropdown {
