@@ -2,7 +2,7 @@
 
 Read-only Qlik load script viewer with syntax highlighting — add it to any Qlik Sense sheet to display a field containing app load scripts in a formatted, color-coded code viewer.
 
-Primarily intended for use with **Qlik Sense Enterprise on Windows** (client-managed), but also compatible with **Qlik Sense Cloud**.
+Primarily intended for use with **Qlik Sense Enterprise on Windows** (client-managed). Also compatible with **Qlik Sense Cloud**, though the data pipeline for Cloud is more complex (see [docs/getting-started.md](docs/getting-started.md)).
 
 ## ❤️ Support the project
 
@@ -44,6 +44,8 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 
 ## Getting Started
 
+> For a complete walkthrough — from installing the extension to extracting scripts from Sense apps and running AI analysis — see [docs/getting-started.md](docs/getting-started.md).
+
 ### Prerequisites
 
 - **Qlik Sense Enterprise on Windows** (client-managed) — May 2025 or later (may work on older versions but is not tested) or **Qlik Sense Cloud**
@@ -83,6 +85,8 @@ Each release includes two variants of the extension:
 2. Click **Add**, upload `qvsview-qs.zip` (the inner ZIP from the release package).
 3. Open any app, enter edit mode, and drag **QvsView.qs** from the custom objects panel onto a sheet.
 
+> **Note**: This guide focuses on client-managed Qlik Sense Enterprise. The extension also installs on Qlik Sense Cloud, but the data pipeline for extracting and loading scripts into Cloud apps is more complex and not covered here. See [docs/getting-started.md](docs/getting-started.md) for the client-managed workflow.
+
 ### First Use
 
 1. With the extension on a sheet in edit mode, open the **property panel** and add a **Dimension** — select the field that contains your script rows.
@@ -95,10 +99,10 @@ Each release includes two variants of the extension:
 
 ## Platform Support
 
-| Platform                                          | Status                        |
-| ------------------------------------------------- | ----------------------------- |
-| Qlik Sense Enterprise on Windows (client-managed) | Supported, 2025-May and later |
-| Qlik Sense Cloud                                  | Supported                     |
+| Platform                                          | Status                           |
+| ------------------------------------------------- | -------------------------------- |
+| Qlik Sense Enterprise on Windows (client-managed) | **Primary** — full documentation |
+| Qlik Sense Cloud                                  | Supported — limited guidance     |
 
 Platform detection is automatic — the extension identifies the environment and adapts accordingly.
 
