@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.6.0...qvsview-qs-v0.6.1) (2026-04-25)
+
+
+### Documentation
+
+* Add getting started and configuration docs ([c87d08a](https://github.com/ptarmiganlabs/QvsView.qs/commit/c87d08a446ac6b0ebfbb728a4d1320839045c1f4))
+* Add reference to license file ([9514425](https://github.com/ptarmiganlabs/QvsView.qs/commit/951442550053d76812104128fd7c978641f36faa))
+
 ## [0.6.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.5.0...qvsview-qs-v0.6.0) (2026-04-24)
 
 ### Features

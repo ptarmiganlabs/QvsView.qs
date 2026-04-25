@@ -2,7 +2,7 @@
     "name": "QvsView.qs",
     "description": "Read-only Qlik script viewer with syntax highlighting",
     "type": "visualization",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "icon": "code",
     "preview": "preview.png",
     "author": "Göran Sander, Ptarmigan Labs",
