@@ -14,13 +14,20 @@ import {
     useLayout,
     useEffect,
     useModel,
+    useApp,
     useState,
     onContextMenu,
 } from '@nebula.js/stardust';
 import ext from './ext/index.js';
 import data from './data.js';
 import definition from './object-properties.js';
-import { renderViewer, renderPlaceholder, renderLoading, renderWarning } from './ui/viewer.js';
+import {
+    renderViewer,
+    renderViewerEmptyState,
+    renderPlaceholder,
+    renderLoading,
+    renderWarning,
+} from './ui/viewer.js';
 import { applyRuntimeBnf, resetToStaticBnf } from './syntax/keywords.js';
 import { fetchRuntimeBnf, clearBnfCache } from './syntax/bnf-loader.js';
 import logger, { PACKAGE_VERSION, BUILD_DATE } from './util/logger.js';
@@ -58,6 +65,7 @@ export default function supernova(_galaxy) {
         component() {
             const layout = useLayout();
             const model = useModel();
+            const app = useApp();
             const element = useElement();
 
             /**
@@ -68,6 +76,13 @@ export default function supernova(_galaxy) {
             const [rawRows, setRawRows] = useState(null);
             const [activeIds, setActiveIds] = useState(null);
             const [bnfReady, setBnfReady] = useState(false);
+
+            /**
+             * All available source field values, fetched via the Field API
+             * so they are visible regardless of the current hypercube selection.
+             * Used to populate the script source selector dropdown.
+             */
+            const [allSourceValues, setAllSourceValues] = useState([]);
 
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
@@ -92,6 +107,27 @@ export default function supernova(_galaxy) {
                     setBnfReady(true);
                 }
             }, [layout?.viewer?.useRuntimeBnf]);
+
+            // Fetch ALL source field values via the Field API (bypasses current selections)
+            // so the selector dropdown always shows the complete list.
+            useEffect(() => {
+                if (!app || !layout) return;
+                const showSelector = layout.toolbar?.showAppSelector === true;
+                if (!showSelector) {
+                    setAllSourceValues([]);
+                    return;
+                }
+                const fieldName = getSourceFieldName(layout);
+                if (!fieldName) {
+                    setAllSourceValues([]);
+                    return;
+                }
+                fetchAllFieldValues(app, fieldName).then(setAllSourceValues);
+            }, [
+                app,
+                layout?.qHyperCube?.qDimensionInfo?.[2]?.qGroupFieldDefs?.[0],
+                layout?.toolbar?.showAppSelector,
+            ]);
 
             // Fetch raw row data via the hypercube (row number dimension prevents deduplication)
             useEffect(() => {
@@ -163,9 +199,48 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // Multi-app warning: multiple distinct sources after selections
+                const viewerOpts = layout.viewer || {};
+                const toolbarOpts = layout.toolbar || {};
+                const aiOpts = layout.ai || {};
+                const aiEnabled = aiOpts.enabled === true;
+
+                // App selector: show when enabled AND Dim 3 is configured
+                const showAppSelector = toolbarOpts.showAppSelector === true;
+
+                // Use all field values fetched via the Field API (ignores current selections)
+                // so the dropdown always shows every available script source.
+                const selectorValues = showAppSelector ? allSourceValues : [];
+
+                // Determine selected app: exactly one source active means a selection is set
+                const selectedApp =
+                    showAppSelector && activeIds && activeIds.length === 1 ? activeIds[0] : null;
+
+                /**
+                 * Apply or clear the script source selection from the viewer selector.
+                 *
+                 * @param {string|null} value - Selected source value, or null to clear the selection.
+                 *
+                 * @returns {void}
+                 */
+                const onSelectorChange = (value) => {
+                    handleAppSelect(app, layout, value);
+                };
+
+                // Multi-app warning: multiple distinct sources after selections.
+                // When the selector is enabled, keep the widget usable so the user can
+                // still pick a single script source directly from the toolbar row.
                 if (activeIds && activeIds.length > 1) {
-                    const viewerOpts = layout.viewer || {};
+                    if (showAppSelector) {
+                        renderViewerEmptyState(element, {
+                            message: 'Select a script source to view its script.',
+                            showAppSelector,
+                            selectorValues,
+                            selectedApp: null,
+                            onAppSelect: onSelectorChange,
+                        });
+                        return;
+                    }
+
                     const message =
                         viewerOpts.multiAppWarningMessage ||
                         'Multiple scripts detected. Use a filter to select a single script source.';
@@ -181,14 +256,22 @@ export default function supernova(_galaxy) {
 
                 const script = filteredRows.map((r) => r.text).join('\n');
                 if (!script) {
+                    if (showAppSelector) {
+                        renderViewerEmptyState(element, {
+                            message: selectedApp
+                                ? 'No script lines found for the selected script source.'
+                                : 'Select a script source to view its script.',
+                            showAppSelector,
+                            selectorValues,
+                            selectedApp,
+                            onAppSelect: onSelectorChange,
+                        });
+                        return;
+                    }
+
                     renderPlaceholder(element);
                     return;
                 }
-
-                const viewerOpts = layout.viewer || {};
-                const toolbarOpts = layout.toolbar || {};
-                const aiOpts = layout.ai || {};
-                const aiEnabled = aiOpts.enabled === true;
 
                 renderViewer(element, {
                     script,
@@ -199,11 +282,15 @@ export default function supernova(_galaxy) {
                     showCopyButton: toolbarOpts.showCopyButton !== false,
                     showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
                     showSearch: toolbarOpts.showSearch === true,
+                    showAppSelector,
+                    selectorValues,
+                    selectedApp,
+                    onAppSelect: showAppSelector ? onSelectorChange : null,
                     showAiAnalysis: aiEnabled,
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
-            }, [layout, element, rawRows, activeIds, bnfReady]);
+            }, [layout, element, rawRows, activeIds, bnfReady, allSourceValues]);
         },
     };
 }
@@ -487,4 +574,105 @@ async function fetchActiveIdentifiers(layout, model) {
     }
 
     return [...idSet];
+}
+
+/**
+ * Extract the script source field name from the 3rd hypercube dimension.
+ *
+ * Handles plain field names, bracket-quoted names (`[FieldName]`), and
+ * expression prefixes (`=[FieldName]`).
+ *
+ * @param {object} layout - Qlik Sense layout object.
+ *
+ * @returns {string|null} The field name, or null if unavailable.
+ */
+function getSourceFieldName(layout) {
+    const dimInfo = layout?.qHyperCube?.qDimensionInfo?.[2];
+    if (!dimInfo) return null;
+
+    // qGroupFieldDefs[0] is the canonical field name for simple (non-grouped) dimensions
+    let fieldName = dimInfo.qGroupFieldDefs?.[0] || dimInfo.qFallbackTitle;
+    if (!fieldName) return null;
+
+    // Strip expression prefix and outer brackets: "=[FieldName]" → "FieldName"
+    fieldName = fieldName.replace(/^=/, '').replace(/^\[|\]$/g, '');
+
+    return fieldName || null;
+}
+
+/**
+ * Fetch ALL distinct values for a field via the Qlik Field API.
+ *
+ * Unlike reading from the hypercube (which only returns rows matching
+ * current selections), `field.getData()` returns every value in the field
+ * regardless of selection state — making it the correct source for populating
+ * the script source selector dropdown.
+ *
+ * @param {object} app - Qlik Doc API (from useApp hook).
+ * @param {string} fieldName - The field name to query.
+ *
+ * @returns {Promise<string[]>} Sorted, deduplicated list of all field values.
+ */
+async function fetchAllFieldValues(app, fieldName) {
+    if (!app || !fieldName) return [];
+
+    try {
+        const field = await app.getField(fieldName);
+        if (!field) return [];
+
+        // getData returns all field values (selected, optional, excluded) in pages
+        const dataPages = await field.getData([{ qTop: 0, qLeft: 0, qWidth: 1, qHeight: 10000 }]);
+
+        const values = [];
+        for (const page of dataPages || []) {
+            for (const row of page.qMatrix || []) {
+                const text = row[0]?.qText;
+                if (text != null && text !== '') {
+                    values.push(text);
+                }
+            }
+        }
+
+        return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+    } catch (err) {
+        logger.warn('fetchAllFieldValues: Field API call failed:', err);
+        return [];
+    }
+}
+
+/**
+ * Handle a script source selection from the selector dropdown.
+ *
+ * Calls `field.selectValues()` to set a selection on the script source field,
+ * or `field.clear()` to remove any selection when value is null.
+ *
+ * @param {object} app - Qlik Doc API (from useApp hook).
+ * @param {object} layout - Qlik Sense layout object.
+ * @param {string|null} value - The selected value text, or null to clear.
+ *
+ * @returns {Promise<void>}
+ */
+async function handleAppSelect(app, layout, value) {
+    if (!app) return;
+
+    const fieldName = getSourceFieldName(layout);
+    if (!fieldName) {
+        logger.warn('App selector: could not determine script source field name');
+        return;
+    }
+
+    try {
+        const field = await app.getField(fieldName);
+        if (!field) return;
+
+        if (value == null) {
+            await field.clear();
+            logger.info(`App selector: cleared selection on "${fieldName}"`);
+        } else {
+            await field.selectValues([{ qText: value, qIsNumeric: false }], false, false);
+            logger.info(`App selector: selected "${value}" in "${fieldName}"`);
+        }
+    } catch (err) {
+        logger.warn('App selector: selection failed:', err);
+    }
 }

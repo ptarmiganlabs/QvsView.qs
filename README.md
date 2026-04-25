@@ -31,6 +31,7 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 - **Section tabs** — automatically detects script sections and renders a clickable tab strip for instant navigation between script sections
 - **Search** (Ctrl/Cmd+F) — real-time search with highlighted matches; automatically expands any folded regions that contain a match
 - **Code folding** — collapse and expand sections to focus on specific parts of the script; fold state is preserved while navigating
+- **Script source selection** — optional searchable dropdown shown as a 2nd row in the viewer toolbar, listing all available values from Dim 3 (the script source field); selecting a value applies a selection in the app's data model, filtering which script is displayed
 - **Copy to clipboard** — one-click copy of the visible section or the full concatenated script
 - **Deprecated function detection** — deprecated Qlik functions are rendered with strikethrough styling, sourced from the BNF definition
 - **Runtime BNF** — optionally fetches the authoritative keyword list live from the Qlik Engine API for maximum accuracy
@@ -49,9 +50,10 @@ _This project is maintained by [Göran Sander](https://github.com/mountaindude) 
 ### Prerequisites
 
 - **Qlik Sense Enterprise on Windows** (client-managed) — May 2025 or later (may work on older versions but is not tested) or **Qlik Sense Cloud**
-- Two fields in your data model:
-    - One field containing the load scripts' rows (typically loaded from `.qvs` files)
-    - One field containing a script identifier, such as the script file name, app name or app ID. Has to be unique across all scripts loaded into the app.
+- Three fields in your data model:
+    - A row number field (numeric) — e.g. a field set to `RecNo()` or `RowNo()` during load, used to preserve original script line order
+    - A script text field — one row per line of Qlik script (typically loaded from `.qvs` files)
+    - A script source field — identifies each script, such as a file name, app name, or app ID; must be unique across all scripts loaded into the app
 
 ### Download
 
@@ -89,11 +91,14 @@ Each release includes two variants of the extension:
 
 ### First Use
 
-1. With the extension on a sheet in edit mode, open the **property panel** and add a **Dimension** — select the field that contains your script rows.
-2. Add a second **Dimension** — select the field that contains the script identifier (e.g. file name, app name, or app ID).
-3. Optionally adjust viewer settings: font size, line numbers, and other display options.
-4. Switch to analysis mode. The script renders with full syntax highlighting.
-5. Use the **section tabs** to jump between tabs, press **Ctrl/Cmd+F** to open the search bar, and click the fold indicators in the gutter to collapse sections.
+1. With the extension on a sheet in edit mode, open the **property panel** and add three **Dimensions** in order:
+    - **Dim 1** — the row number field (e.g. a field set to `RecNo()` during load)
+    - **Dim 2** — the script text field (one row per line)
+    - **Dim 3** — the script source field (e.g. file name, app name, or app ID)
+2. Optionally adjust viewer settings in the property panel: font size, line numbers, word wrap, and other display options.
+3. Switch to analysis mode. The script renders with full syntax highlighting.
+4. Use the **section tabs** to jump between sections, press **Ctrl/Cmd+F** to open the search bar, and click the fold indicators in the gutter to collapse regions.
+5. To enable the **script source selection dropdown**: enable _Viewer Toolbar → Script file selection_ in the property panel. A searchable dropdown bar appears below the main toolbar, listing all available Dim 3 values. Select a value to filter to a single script; click ✕ to clear.
 
 ---
 
@@ -151,6 +156,28 @@ While waiting for the AI response, the modal shows:
 - **Cycling humorous quotes** with smooth fade transitions (cycle time is configurable, 3–10 s)
 - **Elapsed timer** tracking how long the analysis has been running
 - **Snake mini-game** — a retro canvas-based game (WASD or arrow keys) to pass the time
+
+---
+
+## Script Source Selection
+
+QvsView.qs includes an optional script source selection feature that adds a searchable dropdown as a second row in the viewer toolbar. This lets users select which script to view directly from the extension widget without needing a separate filter pane.
+
+### Setup
+
+1. Ensure Dim 3 (the script source field) is configured in the extension property panel.
+2. Enable **Script file selection** under _Viewer Toolbar → Script file selection_ in the property panel.
+3. A labeled dropdown bar appears below the main toolbar, showing all currently available values from Dim 3.
+
+### How It Works
+
+- The dropdown lists all distinct values from Dim 3 (the script source field) that are currently available given the app's selection state.
+- Type in the dropdown to filter the list in real time (case-insensitive).
+- Click a value (or press Enter) to select it — the selection is applied to the script source field in the app's data model, filtering the displayed script.
+- Click the ✕ button to clear the field selection; all scripts become visible again.
+- Zero or one selection is supported at a time.
+
+> **UX tip:** To switch from one script to another, click ✕ to clear the current selection first, then pick a new value from the dropdown.
 
 ---
 
