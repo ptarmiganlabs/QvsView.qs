@@ -188,3 +188,5 @@ Report bugs or request features via [GitHub Issues](https://github.com/ptarmigan
 ## License
 
 [MIT](LICENSE) © Göran Sander / Ptarmigan Labs
+
+See the [LICENSE](LICENSE) file for full license text.
