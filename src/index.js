@@ -199,6 +199,7 @@ export default function supernova(_galaxy) {
                     showCopyButton: toolbarOpts.showCopyButton !== false,
                     showFontSizeDropdown: toolbarOpts.showFontSizeDropdown === true,
                     showSearch: toolbarOpts.showSearch === true,
+                    showCollapseButtons: toolbarOpts.showCollapseButtons === true,
                     showAiAnalysis: aiEnabled,
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
