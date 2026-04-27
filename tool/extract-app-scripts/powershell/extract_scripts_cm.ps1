@@ -239,7 +239,7 @@ function Extract-AppScript {
     return $true
 }
 
-# === Parser: Extract app ID and name from QRS JSON response ===
+# === Parser: Extract app ID, name, stream ID, and stream name from QRS JSON response ===
 function Parse-AppEntries {
     param([string]$Json)
 
@@ -247,7 +247,9 @@ function Parse-AppEntries {
         $apps = $Json | ConvertFrom-Json
         $result = @()
         foreach ($app in $apps) {
-            $result += "$($app.id)|$($app.name)"
+            $streamId = if ($app.stream) { $app.stream.id } else { "" }
+            $streamName = if ($app.stream) { $app.stream.name } else { "" }
+            $result += "$($app.id)|$($app.name)|$streamId|$streamName"
         }
         return $result -join "`n"
     }
@@ -316,6 +318,8 @@ function Main {
 
         $appId = $parts[0].Trim()
         $appName = $parts[1].Trim()
+        $streamId = if ($parts.Count -gt 2) { $parts[2].Trim() } else { "" }
+        $streamName = if ($parts.Count -gt 3) { $parts[3].Trim() } else { "" }
 
         if (-not $appId) { continue }
         if (-not $appName) { $appName = "app_$appId" }
@@ -348,13 +352,15 @@ function Main {
 
     # Create app_mapping.csv for traceability
     $csvFile = Join-Path $outputFolder "app_mapping.csv"
-    "app_id,app_name,file_name" | Out-File -FilePath $csvFile -Encoding UTF8
+    "app_id,app_name,stream_id,stream_name,file_name" | Out-File -FilePath $csvFile -Encoding UTF8
     foreach ($entry in $entriesArray) {
         if (-not $entry) { continue }
         $parts = $entry -split '\|'
         if ($parts.Count -lt 2) { continue }
         $appId = $parts[0].Trim()
         $appName = $parts[1].Trim()
+        $csvStreamId = if ($parts.Count -gt 2) { $parts[2].Trim() } else { "" }
+        $csvStreamName = if ($parts.Count -gt 3) { $parts[3].Trim() } else { "" }
         if (-not $appId) { continue }
         if (-not $appName) { $appName = "app_$appId" }
 
@@ -363,7 +369,7 @@ function Main {
         if ($csvSafeAppName.Length -gt 150) { $csvSafeAppName = $csvSafeAppName.Substring(0, 150) }
         $csvFileName = "$csvSafeAppName`_$appId.qvs"
 
-        "`"$appId`",`"$appName`",`"$csvFileName`"" | Out-File -FilePath $csvFile -Append -Encoding UTF8
+        "`"$appId`",`"$appName`",`"$csvStreamId`",`"$csvStreamName`",`"$csvFileName`"" | Out-File -FilePath $csvFile -Append -Encoding UTF8
     }
 
     if ($ENABLE_LATEST_FOLDER) {
