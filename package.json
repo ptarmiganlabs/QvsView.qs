@@ -1,6 +1,6 @@
 {
     "name": "qvsview-qs",
-    "version": "0.6.1",
+    "version": "0.7.0",
     "type": "module",
     "description": "Qlik Sense extension for viewing load scripts with syntax highlighting",
     "license": "MIT",
