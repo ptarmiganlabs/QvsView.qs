@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.7.0...qvsview-qs-v0.7.1) (2026-04-27)
+
+
+### Miscellaneous
+
+* update README.pdf with latest documentation changes ([3aa15b3](https://github.com/ptarmiganlabs/QvsView.qs/commit/3aa15b3cf3dd951a27d7f9109d1446b6fc9f3da1))
+
 ## [0.7.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.6.1...qvsview-qs-v0.7.0) (2026-04-27)
 
 
