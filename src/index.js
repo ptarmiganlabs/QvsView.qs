@@ -14,6 +14,7 @@ import {
     useLayout,
     useEffect,
     useModel,
+    useApp,
     useState,
     onContextMenu,
 } from '@nebula.js/stardust';
@@ -58,16 +59,27 @@ export default function supernova(_galaxy) {
         component() {
             const layout = useLayout();
             const model = useModel();
+            const app = useApp();
             const element = useElement();
 
             /**
-             * Raw row data from GetTableData. Contains per-row identifiers
-             * when a second dimension is configured, enabling client-side
-             * filtering based on hypercube selection state.
+             * Distinct script-source identifiers currently in scope.
+             * undefined → discovery still pending; [] → no data;
+             * length 1 → single source (use overrideScript);
+             * length > 1 → multi-source warning.
              */
-            const [rawRows, setRawRows] = useState(null);
-            const [activeIds, setActiveIds] = useState(null);
+            const [activeIds, setActiveIds] = useState(undefined);
             const [bnfReady, setBnfReady] = useState(false);
+            // Full script for the currently active source, fetched via a
+            // secondary session hypercube whose measure uses set analysis
+            // to ignore selections in the script-text field (Dim 2).
+            // null when no single source is active or the fetch is pending.
+            const [overrideScript, setOverrideScript] = useState(null);
+            // true when prerequisites for the override fetch are unavailable
+            // (e.g. app not yet ready, field names missing). Distinguishes
+            // "cannot fetch" from "fetch pending" so the UI does not get stuck
+            // on a loading spinner indefinitely.
+            const [overrideFetchBlocked, setOverrideFetchBlocked] = useState(false);
 
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
@@ -93,30 +105,186 @@ export default function supernova(_galaxy) {
                 }
             }, [layout?.viewer?.useRuntimeBnf]);
 
-            // Fetch raw row data via the hypercube (row number dimension prevents deduplication)
+            // Discover the distinct script sources currently in scope.
+            // This is the only data the main hypercube is queried for; the
+            // actual script text is fetched per-source via the override
+            // session hypercube below. Skipping the full row-paginated
+            // fetch is what makes initial render fast even with 100k+
+            // hypercube rows.
             useEffect(() => {
                 if (!layout || !model) return;
 
-                // Reset immediately so the render effect never sees a stale rawRows/activeIds
-                // combination (e.g. new activeIds arriving before new rawRows would otherwise
-                // produce an empty filteredRows and trigger the wrong placeholder).
-                setRawRows(null);
-                setActiveIds(null);
+                setActiveIds(undefined);
 
-                fetchAllRows(layout, model)
-                    .then(setRawRows)
-                    .catch((err) => {
-                        logger.warn('Data fetch failed:', err);
-                        setRawRows(null);
-                    });
-
-                // Fetch active identifiers from the hypercube (script source is always at col 2)
                 if (layout.qHyperCube?.qDimensionInfo?.[2]) {
-                    fetchActiveIdentifiers(layout, model).then(setActiveIds);
+                    fetchActiveIdentifiers(layout, model)
+                        .then(setActiveIds)
+                        .catch((err) => {
+                            logger.warn('fetchActiveIdentifiers failed:', err);
+                            setActiveIds([]);
+                        });
                 } else {
-                    setActiveIds(null);
+                    setActiveIds([]);
                 }
             }, [layout, model]);
+
+            // Discover the three configured field names from layout. Used as
+            // primitive deps for the override-fetch effect below so that the
+            // session hypercube is recreated only when field names change,
+            // not on every selection-driven layout update.
+            const dimInfo = layout?.qHyperCube?.qDimensionInfo;
+            const rowField = dimInfo?.[0]?.qGroupFieldDefs?.[0] || null;
+            const textField = dimInfo?.[1]?.qGroupFieldDefs?.[0] || null;
+            const sourceField = dimInfo?.[2]?.qGroupFieldDefs?.[0] || null;
+            const activeSourceId = activeIds && activeIds.length === 1 ? activeIds[0] : null;
+
+            // Fetch the FULL script for the currently active source via a
+            // secondary session hypercube whose measure uses set analysis to
+            // ignore selections in the script-text field (Dim 2). This is what
+            // gives the user the "single-source = full script even with a
+            // Dim-2 selection" behaviour. All other selections are honored
+            // naturally because they still apply to the session hypercube.
+            useEffect(() => {
+                // No single source active — reset states and do nothing.
+                if (!activeSourceId) {
+                    setOverrideScript(null);
+                    setOverrideFetchBlocked(false);
+                    return undefined;
+                }
+
+                // Prerequisites unavailable (app or field names missing) — signal
+                // "blocked" so the UI renders a placeholder instead of spinning.
+                if (!app || !rowField || !textField || !sourceField) {
+                    logger.warn('Override fetch prerequisites missing:', {
+                        app: !!app,
+                        rowField,
+                        textField,
+                        sourceField,
+                    });
+                    setOverrideScript(null);
+                    setOverrideFetchBlocked(true);
+                    return undefined;
+                }
+
+                // Prerequisites met — reset to "loading" state before starting fetch.
+                setOverrideFetchBlocked(false);
+                setOverrideScript(null);
+
+                let cancelled = false;
+                let sessionModel = null;
+                let changedHandler = null;
+
+                const def = {
+                    qInfo: { qType: 'qvs-script-override' },
+                    qHyperCubeDef: {
+                        qDimensions: [
+                            {
+                                qDef: {
+                                    qFieldDefs: [`[${sourceField}]`],
+                                    qSortCriterias: [{ qSortByAscii: 1 }],
+                                },
+                            },
+                        ],
+                        qMeasures: [
+                            {
+                                qDef: {
+                                    qDef: `=Concat({<[${textField}]=>} [${textField}], Chr(10), [${rowField}])`,
+                                },
+                            },
+                        ],
+                        qInitialDataFetch: [{ qTop: 0, qLeft: 0, qWidth: 2, qHeight: 1000 }],
+                    },
+                };
+
+                /**
+                 * Find the active source row in the session hypercube layout
+                 * and update overrideScript with its measure value.
+                 * Keeps the override in a loading state (null) when the
+                 * expected row is not yet present instead of treating it as
+                 * an empty script.
+                 *
+                 * @param {object} l - Session-object layout.
+                 * @returns {void}
+                 */
+                const handleLayout = (l) => {
+                    if (cancelled) return;
+
+                    const matrix = l?.qHyperCube?.qDataPages?.[0]?.qMatrix;
+                    if (!Array.isArray(matrix)) {
+                        logger.warn('Override session layout missing expected hypercube matrix:', {
+                            activeSourceId,
+                            layout: l,
+                        });
+                        setOverrideScript(null);
+                        return;
+                    }
+
+                    const row = matrix.find((r) => r[0]?.qText === activeSourceId);
+                    if (!row) {
+                        logger.warn(
+                            'Active source row not present in override session hypercube matrix:',
+                            {
+                                activeSourceId,
+                            }
+                        );
+                        setOverrideScript(null);
+                        return;
+                    }
+
+                    setOverrideScript(row[1]?.qText ?? '');
+                };
+
+                app.createSessionObject(def)
+                    .then(async (m) => {
+                        if (cancelled) {
+                            app.destroySessionObject(m.id).catch(() => {
+                                /* ignore */
+                            });
+                            return;
+                        }
+                        sessionModel = m;
+                        try {
+                            const l = await m.getLayout();
+                            handleLayout(l);
+                        } catch (e) {
+                            logger.warn('Override session getLayout failed:', e);
+                        }
+                        /**
+                         * Re-read the session-object layout when the engine
+                         * notifies us of a change (e.g. selections changed in
+                         * a non-ignored field, or initial pages arrived).
+                         */
+                        changedHandler = async () => {
+                            try {
+                                const ll = await m.getLayout();
+                                handleLayout(ll);
+                            } catch (e) {
+                                logger.warn('Override session changed-layout failed:', e);
+                            }
+                        };
+                        m.on('changed', changedHandler);
+                    })
+                    .catch((err) => {
+                        logger.warn('Failed to create override session hypercube:', err);
+                        if (!cancelled) setOverrideScript(null);
+                    });
+
+                return () => {
+                    cancelled = true;
+                    if (sessionModel) {
+                        if (changedHandler && typeof sessionModel.removeListener === 'function') {
+                            try {
+                                sessionModel.removeListener('changed', changedHandler);
+                            } catch {
+                                /* ignore */
+                            }
+                        }
+                        app.destroySessionObject(sessionModel.id).catch(() => {
+                            /* ignore */
+                        });
+                    }
+                };
+            }, [app, rowField, textField, sourceField, activeSourceId]);
 
             // Add "Copy selected text" to the right-click context menu
             onContextMenu((menu) => {
@@ -152,19 +320,14 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // rawRows === undefined → data fetch still in-flight (show loading state)
-                // rawRows === null or [] → fetch completed but returned nothing usable
-                if (typeof rawRows === 'undefined') {
+                // Active-source discovery still pending → loading.
+                if (typeof activeIds === 'undefined') {
                     renderLoading(element);
                     return;
                 }
-                if (!Array.isArray(rawRows) || rawRows.length === 0) {
-                    renderPlaceholder(element);
-                    return;
-                }
 
-                // Multi-app warning: multiple distinct sources after selections
-                if (activeIds && activeIds.length > 1) {
+                // Multi-source: warn and stop. Fast path — does not wait for any script fetch.
+                if (activeIds.length > 1) {
                     const viewerOpts = layout.viewer || {};
                     const message =
                         viewerOpts.multiAppWarningMessage ||
@@ -173,13 +336,20 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // Filter raw rows by the active identifier when second dim is present
-                let filteredRows = rawRows;
-                if (activeIds && activeIds.length === 1) {
-                    filteredRows = rawRows.filter((r) => r.id === activeIds[0]);
+                // No sources at all (cube empty / source dim missing data).
+                if (activeIds.length === 0) {
+                    renderPlaceholder(element);
+                    return;
                 }
 
-                const script = filteredRows.map((r) => r.text).join('\n');
+                // Exactly one source. Wait for the set-analysis override
+                // hypercube to deliver the full script for that source.
+                if (overrideScript === null && !overrideFetchBlocked) {
+                    renderLoading(element);
+                    return;
+                }
+
+                const script = overrideScript;
                 if (!script) {
                     renderPlaceholder(element);
                     return;
@@ -204,7 +374,7 @@ export default function supernova(_galaxy) {
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
-            }, [layout, element, rawRows, activeIds, bnfReady]);
+            }, [layout, element, activeIds, overrideScript, overrideFetchBlocked, bnfReady]);
         },
     };
 }
@@ -302,97 +472,6 @@ function handleAiAnalyze(info, aiOpts) {
 }
 
 /**
- * Fetch all rows from the hypercube, paginating if necessary.
- *
- * Column layout (fixed — all three dims required):
- *   col 0 — row number  (used for sorting; not extracted here)
- *   col 1 — script text
- *   col 2 — script source / identifier
- *
- * The hypercube is selection-aware — only rows matching active selections
- * are included.
- *
- * @param {object} layout - Qlik Sense layout object.
- * @param {object} model - Qlik engine model (GenericObject).
- *
- * @returns {Promise<Array<{text: string, id: string|null}>|null>}
- *   Array of per-row objects (text + identifier), or null if no data.
- */
-async function fetchAllRows(layout, model) {
-    const hc = layout?.qHyperCube;
-    if (!hc) return null;
-
-    const totalRows = hc.qSize?.qcy || 0;
-    if (totalRows === 0) return null;
-
-    const colCount = hc.qSize?.qcx || 1;
-
-    // Fixed column positions: row number=0, text=1, source=2
-    const textCol = 1;
-    const idCol = 2;
-    const hasIdentifier = colCount >= 3;
-
-    // Collect rows from initial data pages
-    const result = [];
-    const pages = hc.qDataPages;
-    if (pages) {
-        for (const page of pages) {
-            if (page.qMatrix) {
-                for (const row of page.qMatrix) {
-                    if (row.length > textCol) {
-                        result.push({
-                            text: row[textCol]?.qText ?? '',
-                            id:
-                                hasIdentifier && row.length > idCol
-                                    ? (row[idCol]?.qText ?? null)
-                                    : null,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    // If we already have all rows, we're done
-    if (result.length >= totalRows) {
-        return result.length > 0 ? result : null;
-    }
-
-    // Fetch remaining pages
-    // getHyperCubeData has a 10 000-cell limit per call (qWidth × qHeight).
-    const maxRowsPerPage = Math.floor(PAGE_SIZE / colCount);
-    let fetched = result.length;
-    while (fetched < totalRows) {
-        const height = Math.min(maxRowsPerPage, totalRows - fetched);
-        try {
-            const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
-                { qTop: fetched, qLeft: 0, qWidth: colCount, qHeight: height },
-            ]);
-            if (!dataPages || dataPages.length === 0) break;
-            const matrix = dataPages[0].qMatrix;
-            if (!matrix || matrix.length === 0) break;
-            for (const row of matrix) {
-                if (row.length > textCol) {
-                    result.push({
-                        text: row[textCol]?.qText ?? '',
-                        id:
-                            hasIdentifier && row.length > idCol
-                                ? (row[idCol]?.qText ?? null)
-                                : null,
-                    });
-                }
-            }
-            fetched = result.length;
-        } catch (err) {
-            logger.warn('Pagination fetch failed, using partial data:', err);
-            break;
-        }
-    }
-
-    return result.length > 0 ? result : null;
-}
-
-/**
  * Fetch the distinct identifier values currently visible in the hypercube.
  *
  * The hypercube is selection-aware — when the user selects a value in a
@@ -459,8 +538,9 @@ async function fetchActiveIdentifiers(layout, model) {
 
     // ── Step 2: page through getHyperCubeData until >1 ID or all rows read ──
     // getHyperCubeData has a PAGE_SIZE-cell limit (qWidth × qHeight).
+    // Start from rowsSeen to avoid re-fetching rows already scanned above.
     const maxRowsPerPage = Math.floor(PAGE_SIZE / colCount);
-    let top = 0;
+    let top = rowsSeen;
     try {
         while (top < totalRows) {
             const height = Math.min(totalRows - top, maxRowsPerPage);

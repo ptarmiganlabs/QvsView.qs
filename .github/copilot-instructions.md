@@ -11,7 +11,7 @@ This file provides guidance to Copilot when working with code in the QvsView.qs 
 At the start of each session, read:
 
 1. `README.md` for project overview
-2. `docs/qlik-script-viewer-plan.md` for architecture and plan
+2. `docs/architecture.md` for developer-facing architecture
 3. `AGENTS.md` for build commands and conventions
 
 ## Quality Gates
