@@ -117,7 +117,7 @@ tool/extract-app-scripts/
 ```
 output/
 ├── 2026-04-18_143052/              # Timestamped folder
-│   ├── app_mapping.csv             # appId, appName, file_name mapping
+│   ├── app_mapping.csv             # app_id, app_name, stream_id, stream_name, file_name
 │   ├── App1_id.qvs
 │   ├── App2_id.qvs
 │   └── ...

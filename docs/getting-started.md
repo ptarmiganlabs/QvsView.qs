@@ -82,7 +82,7 @@ pwsh ./extract_scripts_cm.ps1
 ```
 output/
 ├── 2026-04-25_120000/              # Timestamped folder
-│   ├── app_mapping.csv              # appId, appName, streamId, streamName, file_name
+│   ├── app_mapping.csv              # app_id, app_name, stream_id, stream_name, file_name
 │   ├── App_1_abc123.qvs
 │   ├── App_2_def456.qvs
 │   └── ...
