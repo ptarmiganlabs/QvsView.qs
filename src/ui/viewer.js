@@ -516,12 +516,28 @@ function renderSection(element, opts) {
         });
     }
 
-    // Collapse All button handler — folds every foldable range in the current tab
+    // Collapse All button handler — folds every top-level foldable range in the current tab.
+    // Nested ranges (whose startLine falls inside another range's body) are intentionally
+    // skipped: they are already hidden once their ancestor is collapsed, so adding them to
+    // foldState would surface spurious placeholders inside a collapsed block.
     const collapseAllBtn = element.querySelector(`.${CSS_PREFIX}-collapse-all-btn`);
     if (collapseAllBtn && enableFolding) {
         collapseAllBtn.addEventListener('click', () => {
+            const allRanges = [...foldMap.values()];
+            const topLevelStartLines = allRanges
+                .filter(
+                    (range) =>
+                        !allRanges.some(
+                            (other) =>
+                                other !== range &&
+                                range.startLine > other.startLine &&
+                                range.startLine <= other.endLine
+                        )
+                )
+                .map((range) => range.startLine);
+
             let changed = false;
-            for (const startLine of foldMap.keys()) {
+            for (const startLine of topLevelStartLines) {
                 if (!foldState.has(startLine)) {
                     foldState.add(startLine);
                     changed = true;
