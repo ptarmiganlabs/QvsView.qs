@@ -40,7 +40,11 @@ QvsView.qs/
 ├── bnf/                          # Reference BNF grammar
 │   └── getBaseBNF_result.json
 ├── docs/                         # Documentation
-│   └── qlik-script-viewer-plan.md
+│   ├── architecture.md           # Developer-facing architecture
+│   ├── bnf-parsing-methodology.md
+│   ├── configuration.md
+│   ├── getting-started.md
+│   └── ai-analysis.md
 ├── scripts/                      # Build utilities
 │   ├── build-date.cjs
 │   ├── post-build.mjs
@@ -104,8 +108,4 @@ When adding/modifying functions, include complete JSDoc: describe behavior, list
 
 ## Project Todo List
 
-**Keep a project-wide todo list** in `./docs/TODO.md` for things that need follow-up:
-
-- Feature gaps or missing test coverage
-- Known issues or bugs
-- Ideas for future enhancements (e.g., BNF parser integration, dark theme, section tabs)
+Track open items in GitHub Issues rather than a local file.
