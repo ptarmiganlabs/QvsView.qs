@@ -132,7 +132,7 @@ function findAllMatches(sections, query) {
 }
 
 /**
- * Build the toolbar HTML (optional search bar + font size dropdown + copy button + AI analyze).
+ * Build the toolbar HTML (optional search bar + font size dropdown + copy button + AI analyze + collapse buttons).
  *
  * Returns an empty string when no features are enabled, so the caller can omit
  * the toolbar row entirely from the DOM.
@@ -143,6 +143,8 @@ function findAllMatches(sections, query) {
  * @param {number} toolbarOpts.fontSize - Current font size value.
  * @param {string} [toolbarOpts.searchHTML] - Pre-built search bar HTML to include.
  * @param {boolean} [toolbarOpts.showAiAnalysis] - Whether to show the AI Analyze button.
+ * @param {boolean} [toolbarOpts.showCollapseButtons] - Whether to show Collapse All / Expand All buttons.
+ * @param {boolean} [toolbarOpts.enableFolding] - Whether code folding is active (gates collapse buttons).
  *
  * @returns {string} HTML string for the toolbar, or an empty string when there is nothing to show.
  */
@@ -153,6 +155,8 @@ function buildToolbar(toolbarOpts) {
         fontSize = 13,
         searchHTML = '',
         showAiAnalysis = false,
+        showCollapseButtons = false,
+        enableFolding = true,
     } = toolbarOpts;
 
     const sizes = [10, 11, 12, 13, 14, 16, 18, 20];
@@ -168,7 +172,13 @@ function buildToolbar(toolbarOpts) {
         ? `<button class="${CSS_PREFIX}-ai-analyze-btn" title="AI Script Analysis">🤖 Analyze</button>`
         : '';
 
-    if (!searchHTML && !fontSizeHTML && !copyHTML && !aiHTML) {
+    const collapseHTML =
+        showCollapseButtons && enableFolding
+            ? `<button class="${CSS_PREFIX}-collapse-all-btn" title="Collapse all sections in current tab" aria-label="Collapse all foldable regions in current tab">&#8615; Collapse All</button>` +
+              `<button class="${CSS_PREFIX}-expand-all-btn" title="Expand all sections in current tab" aria-label="Expand all foldable regions in current tab">&#8613; Expand All</button>`
+            : '';
+
+    if (!searchHTML && !fontSizeHTML && !copyHTML && !aiHTML && !collapseHTML) {
         return '';
     }
 
@@ -177,6 +187,7 @@ function buildToolbar(toolbarOpts) {
         ${fontSizeHTML}
         ${copyHTML}
         ${aiHTML}
+        ${collapseHTML}
     </div>`;
 }
 
@@ -208,6 +219,7 @@ export function renderViewer(element, options) {
         showFontSizeDropdown = false,
         showSearch = false,
         showAiAnalysis = false,
+        showCollapseButtons = false,
         aiConfig = null,
         onAiAnalyze = null,
     } = options;
@@ -235,6 +247,7 @@ export function renderViewer(element, options) {
         showFontSizeDropdown,
         showSearch,
         showAiAnalysis,
+        showCollapseButtons,
         aiConfig,
         onAiAnalyze,
     });
@@ -254,6 +267,7 @@ export function renderViewer(element, options) {
  * @param {boolean} opts.enableFolding - Whether code folding is enabled.
  * @param {boolean} opts.showCopyButton - Whether to show the copy button.
  * @param {boolean} opts.showFontSizeDropdown - Whether to show the font size dropdown.
+ * @param {boolean} [opts.showCollapseButtons] - Whether to show Collapse All / Expand All buttons.
  *
  * @returns {void}
  */
@@ -270,6 +284,7 @@ function renderSection(element, opts) {
         showFontSizeDropdown,
         showSearch,
         showAiAnalysis,
+        showCollapseButtons,
         aiConfig,
     } = opts;
 
@@ -420,7 +435,7 @@ function renderSection(element, opts) {
     element.innerHTML = `
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
-                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
+                ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis, showCollapseButtons, enableFolding })}
                 ${buildTabBar(sections, activeIndex, matchCountsPerTab)}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
@@ -498,6 +513,52 @@ function renderSection(element, opts) {
                     copyBtn.textContent = 'Failed';
                 }
             );
+        });
+    }
+
+    // Collapse All button handler — folds every top-level foldable range in the current tab.
+    // Nested ranges (whose startLine falls inside another range's body) are intentionally
+    // skipped: they are already hidden once their ancestor is collapsed, so adding them to
+    // foldState would surface spurious placeholders inside a collapsed block.
+    const collapseAllBtn = element.querySelector(`.${CSS_PREFIX}-collapse-all-btn`);
+    if (collapseAllBtn && enableFolding) {
+        collapseAllBtn.addEventListener('click', () => {
+            const allRanges = [...foldMap.values()];
+            const topLevelStartLines = allRanges
+                .filter(
+                    (range) =>
+                        !allRanges.some(
+                            (other) =>
+                                other !== range &&
+                                range.startLine > other.startLine &&
+                                range.startLine <= other.endLine
+                        )
+                )
+                .map((range) => range.startLine);
+
+            let changed = false;
+            for (const startLine of topLevelStartLines) {
+                if (!foldState.has(startLine)) {
+                    foldState.add(startLine);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                saveFoldState(element, foldState);
+                renderSection(element, opts);
+            }
+        });
+    }
+
+    // Expand All button handler — unfolds every collapsed range in the current tab
+    const expandAllBtn = element.querySelector(`.${CSS_PREFIX}-expand-all-btn`);
+    if (expandAllBtn && enableFolding) {
+        expandAllBtn.addEventListener('click', () => {
+            if (foldState.size > 0) {
+                foldState.clear();
+                saveFoldState(element, foldState);
+                renderSection(element, opts);
+            }
         });
     }
 

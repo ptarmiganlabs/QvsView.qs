@@ -123,11 +123,12 @@ Controls the visual presentation of the script viewer.
 
 Controls which buttons and controls appear in the toolbar rendered at the top of the viewer.
 
-| Setting                | Default | Description                                                                                                                                                                                                    |
-| ---------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Copy button**        | On      | Shows a **Copy** button that copies the entire script to the clipboard with a single click. Useful for quickly extracting a script from the viewer for use elsewhere.                                          |
-| **Font size dropdown** | Off     | Shows a compact dropdown in the toolbar that lets users change the font size at runtime without entering edit mode. When off, the font size is locked to the value set in [Viewer Settings](#viewer-settings). |
-| **Search**             | Off     | Shows a **Search** field in the toolbar, allowing users to search for text within the displayed script in analysis mode.                                                                                       |
+| Setting                               | Default | Description                                                                                                                                                                                                                                   |
+| ------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Copy button**                       | On      | Shows a **Copy** button that copies the entire script to the clipboard with a single click. Useful for quickly extracting a script from the viewer for use elsewhere.                                                                         |
+| **Font size dropdown**                | Off     | Shows a compact dropdown in the toolbar that lets users change the font size at runtime without entering edit mode. When off, the font size is locked to the value set in [Viewer Settings](#viewer-settings).                                |
+| **Search**                            | Off     | Shows a **Search** field in the toolbar, allowing users to search for text within the displayed script in analysis mode.                                                                                                                      |
+| **Collapse all / Expand all buttons** | Off     | Shows **Collapse All** and **Expand All** buttons in the toolbar. **Collapse All** collapses every foldable region in the current script tab with a single click. **Expand All** expands them all. Only visible when Code folding is enabled. |
 
 </td>
 </tr>

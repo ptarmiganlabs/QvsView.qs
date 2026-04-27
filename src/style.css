@@ -82,7 +82,10 @@
     border-bottom: 1px solid #ddd;
 }
 
-.qvs-copy-btn {
+/* ── Toolbar action buttons (Copy, Collapse All, Expand All) ── */
+.qvs-copy-btn,
+.qvs-collapse-all-btn,
+.qvs-expand-all-btn {
     padding: 4px 10px;
     border: 1px solid #ccc;
     border-radius: 3px;
@@ -97,7 +100,9 @@
         color 0.15s;
 }
 
-.qvs-copy-btn:hover {
+.qvs-copy-btn:hover,
+.qvs-collapse-all-btn:hover,
+.qvs-expand-all-btn:hover {
     background: #e8e8e8;
     color: #333;
 }
