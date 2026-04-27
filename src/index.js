@@ -67,8 +67,13 @@ export default function supernova(_galaxy) {
              * when a second dimension is configured, enabling client-side
              * filtering based on hypercube selection state.
              */
-            const [rawRows, setRawRows] = useState(null);
-            const [activeIds, setActiveIds] = useState(null);
+            /**
+             * Distinct script-source identifiers currently in scope.
+             * undefined → discovery still pending; [] → no data;
+             * length 1 → single source (use overrideScript);
+             * length > 1 → multi-source warning.
+             */
+            const [activeIds, setActiveIds] = useState(undefined);
             const [bnfReady, setBnfReady] = useState(false);
             // Full script for the currently active source, fetched via a
             // secondary session hypercube whose measure uses set analysis
@@ -100,28 +105,26 @@ export default function supernova(_galaxy) {
                 }
             }, [layout?.viewer?.useRuntimeBnf]);
 
-            // Fetch raw row data via the hypercube (row number dimension prevents deduplication)
+            // Discover the distinct script sources currently in scope.
+            // This is the only data the main hypercube is queried for; the
+            // actual script text is fetched per-source via the override
+            // session hypercube below. Skipping the full row-paginated
+            // fetch is what makes initial render fast even with 100k+
+            // hypercube rows.
             useEffect(() => {
                 if (!layout || !model) return;
 
-                // Reset immediately so the render effect never sees a stale rawRows/activeIds
-                // combination (e.g. new activeIds arriving before new rawRows would otherwise
-                // produce an empty filteredRows and trigger the wrong placeholder).
-                setRawRows(null);
-                setActiveIds(null);
+                setActiveIds(undefined);
 
-                fetchAllRows(layout, model)
-                    .then(setRawRows)
-                    .catch((err) => {
-                        logger.warn('Data fetch failed:', err);
-                        setRawRows(null);
-                    });
-
-                // Fetch active identifiers from the hypercube (script source is always at col 2)
                 if (layout.qHyperCube?.qDimensionInfo?.[2]) {
-                    fetchActiveIdentifiers(layout, model).then(setActiveIds);
+                    fetchActiveIdentifiers(layout, model)
+                        .then(setActiveIds)
+                        .catch((err) => {
+                            logger.warn('fetchActiveIdentifiers failed:', err);
+                            setActiveIds([]);
+                        });
                 } else {
-                    setActiveIds(null);
+                    setActiveIds([]);
                 }
             }, [layout, model]);
 
@@ -272,19 +275,14 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // rawRows === undefined → data fetch still in-flight (show loading state)
-                // rawRows === null or [] → fetch completed but returned nothing usable
-                if (typeof rawRows === 'undefined') {
+                // Active-source discovery still pending → loading.
+                if (typeof activeIds === 'undefined') {
                     renderLoading(element);
                     return;
                 }
-                if (!Array.isArray(rawRows) || rawRows.length === 0) {
-                    renderPlaceholder(element);
-                    return;
-                }
 
-                // Multi-app warning: multiple distinct sources after selections
-                if (activeIds && activeIds.length > 1) {
+                // Multi-source: warn and stop. Fast path — does not wait for any script fetch.
+                if (activeIds.length > 1) {
                     const viewerOpts = layout.viewer || {};
                     const message =
                         viewerOpts.multiAppWarningMessage ||
@@ -293,22 +291,20 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // When a single source is active, prefer the override script
-                // returned by the secondary set-analysis hypercube (which ignores
-                // selections in the script-text field). Fall back to the
-                // selection-aware rawRows for the brief moment before the
-                // override fetch resolves, and for the no-source-selected case.
-                let script;
-                if (activeIds && activeIds.length === 1 && overrideScript !== null) {
-                    script = overrideScript;
-                } else if (activeIds && activeIds.length === 1) {
-                    script = rawRows
-                        .filter((r) => r.id === activeIds[0])
-                        .map((r) => r.text)
-                        .join('\n');
-                } else {
-                    script = rawRows.map((r) => r.text).join('\n');
+                // No sources at all (cube empty / source dim missing data).
+                if (activeIds.length === 0) {
+                    renderPlaceholder(element);
+                    return;
                 }
+
+                // Exactly one source. Wait for the set-analysis override
+                // hypercube to deliver the full script for that source.
+                if (overrideScript === null) {
+                    renderLoading(element);
+                    return;
+                }
+
+                const script = overrideScript;
                 if (!script) {
                     renderPlaceholder(element);
                     return;
@@ -333,7 +329,7 @@ export default function supernova(_galaxy) {
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
-            }, [layout, element, rawRows, activeIds, overrideScript, bnfReady]);
+            }, [layout, element, activeIds, overrideScript, bnfReady]);
         },
     };
 }
@@ -428,97 +424,6 @@ function handleAiAnalyze(info, aiOpts) {
             return result;
         },
     });
-}
-
-/**
- * Fetch all rows from the hypercube, paginating if necessary.
- *
- * Column layout (fixed — all three dims required):
- *   col 0 — row number  (used for sorting; not extracted here)
- *   col 1 — script text
- *   col 2 — script source / identifier
- *
- * The hypercube is selection-aware — only rows matching active selections
- * are included.
- *
- * @param {object} layout - Qlik Sense layout object.
- * @param {object} model - Qlik engine model (GenericObject).
- *
- * @returns {Promise<Array<{text: string, id: string|null}>|null>}
- *   Array of per-row objects (text + identifier), or null if no data.
- */
-async function fetchAllRows(layout, model) {
-    const hc = layout?.qHyperCube;
-    if (!hc) return null;
-
-    const totalRows = hc.qSize?.qcy || 0;
-    if (totalRows === 0) return null;
-
-    const colCount = hc.qSize?.qcx || 1;
-
-    // Fixed column positions: row number=0, text=1, source=2
-    const textCol = 1;
-    const idCol = 2;
-    const hasIdentifier = colCount >= 3;
-
-    // Collect rows from initial data pages
-    const result = [];
-    const pages = hc.qDataPages;
-    if (pages) {
-        for (const page of pages) {
-            if (page.qMatrix) {
-                for (const row of page.qMatrix) {
-                    if (row.length > textCol) {
-                        result.push({
-                            text: row[textCol]?.qText ?? '',
-                            id:
-                                hasIdentifier && row.length > idCol
-                                    ? (row[idCol]?.qText ?? null)
-                                    : null,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    // If we already have all rows, we're done
-    if (result.length >= totalRows) {
-        return result.length > 0 ? result : null;
-    }
-
-    // Fetch remaining pages
-    // getHyperCubeData has a 10 000-cell limit per call (qWidth × qHeight).
-    const maxRowsPerPage = Math.floor(PAGE_SIZE / colCount);
-    let fetched = result.length;
-    while (fetched < totalRows) {
-        const height = Math.min(maxRowsPerPage, totalRows - fetched);
-        try {
-            const dataPages = await model.getHyperCubeData('/qHyperCubeDef', [
-                { qTop: fetched, qLeft: 0, qWidth: colCount, qHeight: height },
-            ]);
-            if (!dataPages || dataPages.length === 0) break;
-            const matrix = dataPages[0].qMatrix;
-            if (!matrix || matrix.length === 0) break;
-            for (const row of matrix) {
-                if (row.length > textCol) {
-                    result.push({
-                        text: row[textCol]?.qText ?? '',
-                        id:
-                            hasIdentifier && row.length > idCol
-                                ? (row[idCol]?.qText ?? null)
-                                : null,
-                    });
-                }
-            }
-            fetched = result.length;
-        } catch (err) {
-            logger.warn('Pagination fetch failed, using partial data:', err);
-            break;
-        }
-    }
-
-    return result.length > 0 ? result : null;
 }
 
 /**
