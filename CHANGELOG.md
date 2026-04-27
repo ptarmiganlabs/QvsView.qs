@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.7.0](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.6.1...qvsview-qs-v0.7.0) (2026-04-27)
+
+
+### Features
+
+* add collapse all / expand all toolbar buttons ([deb32e1](https://github.com/ptarmiganlabs/QvsView.qs/commit/deb32e170c6ab648443c4fd2b4bb9d6d9670f588))
+* add stream_id and stream_name columns to app_mapping.csv ([9190c92](https://github.com/ptarmiganlabs/QvsView.qs/commit/9190c922628642f891ff51052302d036be66c72f))
+* add stream_id and stream_name columns to app_mapping.csv ([34e1bc1](https://github.com/ptarmiganlabs/QvsView.qs/commit/34e1bc161691ddeb38fa50fecc3dd5117ccc625d))
+* split script viewer toolbar into two rows ([9f75c20](https://github.com/ptarmiganlabs/QvsView.qs/commit/9f75c20c0502df04370bdd5a0e5534cc2aa4935b))
+
+
+### Bug Fixes
+
+* address all PR review comments on override-fetch and handleLayout ([c1a7402](https://github.com/ptarmiganlabs/QvsView.qs/commit/c1a7402b88968f445433a2cc18d1b8654c42784c))
+* address reviewer feedback on delimiter safety and CSV escaping ([1118803](https://github.com/ptarmiganlabs/QvsView.qs/commit/1118803a22e95344358ec2fca30315af2ffa9c8a))
+* address reviewer feedback on delimiter safety and CSV escaping ([2614166](https://github.com/ptarmiganlabs/QvsView.qs/commit/26141660179b2d089bbb978ba57fc1a7cf253efe))
+* collapse all folds only top-level ranges, skip nested ranges ([6c5c79c](https://github.com/ptarmiganlabs/QvsView.qs/commit/6c5c79c134fad3e67092f7f51a5b582e0b66efb5))
+
+
+### Refactoring
+
+* Speed up the viewer substantially for large codebases ([d9a7eaf](https://github.com/ptarmiganlabs/QvsView.qs/commit/d9a7eafa961134d1de0a0e3de3537bc05b3e86d1))
+
 ## [0.6.1](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.6.0...qvsview-qs-v0.6.1) (2026-04-25)
 
 ### Documentation
