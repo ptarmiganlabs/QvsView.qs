@@ -134,6 +134,9 @@ function findAllMatches(sections, query) {
 /**
  * Build the toolbar HTML (optional search bar + font size dropdown + copy button + AI analyze).
  *
+ * Returns an empty string when no features are enabled, so the caller can omit
+ * the toolbar row entirely from the DOM.
+ *
  * @param {object} toolbarOpts - Toolbar display options.
  * @param {boolean} toolbarOpts.showCopyButton - Whether to show the copy button.
  * @param {boolean} toolbarOpts.showFontSizeDropdown - Whether to show the font size dropdown.
@@ -141,7 +144,7 @@ function findAllMatches(sections, query) {
  * @param {string} [toolbarOpts.searchHTML] - Pre-built search bar HTML to include.
  * @param {boolean} [toolbarOpts.showAiAnalysis] - Whether to show the AI Analyze button.
  *
- * @returns {string} HTML string for the toolbar.
+ * @returns {string} HTML string for the toolbar, or an empty string when there is nothing to show.
  */
 function buildToolbar(toolbarOpts) {
     const {
@@ -164,6 +167,10 @@ function buildToolbar(toolbarOpts) {
     const aiHTML = showAiAnalysis
         ? `<button class="${CSS_PREFIX}-ai-analyze-btn" title="AI Script Analysis">🤖 Analyze</button>`
         : '';
+
+    if (!searchHTML && !fontSizeHTML && !copyHTML && !aiHTML) {
+        return '';
+    }
 
     return `<div class="${CSS_PREFIX}-toolbar">
         ${searchHTML}
@@ -413,8 +420,8 @@ function renderSection(element, opts) {
     element.innerHTML = `
         <div class="${CSS_PREFIX}-container" tabindex="0">
             <div class="${CSS_PREFIX}-header">
-                ${buildTabBar(sections, activeIndex, matchCountsPerTab)}
                 ${buildToolbar({ showCopyButton, showFontSizeDropdown, fontSize, searchHTML, showAiAnalysis })}
+                ${buildTabBar(sections, activeIndex, matchCountsPerTab)}
             </div>
             <div class="${CSS_PREFIX}-viewer ${wrapClass}">
               <div class="${CSS_PREFIX}-viewer-inner">
