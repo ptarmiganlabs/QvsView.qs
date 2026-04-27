@@ -10,26 +10,24 @@
     overflow: hidden;
 }
 
-/* ── Header (tab bar + toolbar) ── */
+/* ── Header (two-row layout: toolbar row + tab bar row) ── */
 .qvs-header {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     flex-shrink: 0;
-    background: #f0f0f0;
-    border-bottom: 1px solid #ddd;
     min-height: 0;
 }
 
-/* ── Tab bar ── */
+/* ── Tab bar (bottom row, always visible) ── */
 .qvs-tab-bar {
     display: flex;
     flex-direction: row;
     overflow-x: auto;
-    flex: 1 1 auto;
+    flex-shrink: 0;
     gap: 0;
     min-width: 0;
+    background: #f0f0f0;
+    border-bottom: 1px solid #ddd;
 }
 
 .qvs-tab {
@@ -73,13 +71,15 @@
     vertical-align: middle;
 }
 
-/* ── Toolbar ── */
+/* ── Toolbar (top row, hidden when no features are enabled) ── */
 .qvs-toolbar {
     display: flex;
     align-items: center;
     flex-shrink: 0;
     gap: 6px;
-    padding: 0 8px;
+    padding: 4px 8px;
+    background: #f0f0f0;
+    border-bottom: 1px solid #ddd;
 }
 
 .qvs-copy-btn {
