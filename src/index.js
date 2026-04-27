@@ -63,11 +63,6 @@ export default function supernova(_galaxy) {
             const element = useElement();
 
             /**
-             * Raw row data from GetTableData. Contains per-row identifiers
-             * when a second dimension is configured, enabling client-side
-             * filtering based on hypercube selection state.
-             */
-            /**
              * Distinct script-source identifiers currently in scope.
              * undefined → discovery still pending; [] → no data;
              * length 1 → single source (use overrideScript);
@@ -80,6 +75,11 @@ export default function supernova(_galaxy) {
             // to ignore selections in the script-text field (Dim 2).
             // null when no single source is active or the fetch is pending.
             const [overrideScript, setOverrideScript] = useState(null);
+            // true when prerequisites for the override fetch are unavailable
+            // (e.g. app not yet ready, field names missing). Distinguishes
+            // "cannot fetch" from "fetch pending" so the UI does not get stuck
+            // on a loading spinner indefinitely.
+            const [overrideFetchBlocked, setOverrideFetchBlocked] = useState(false);
 
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
@@ -145,10 +145,30 @@ export default function supernova(_galaxy) {
             // Dim-2 selection" behaviour. All other selections are honored
             // naturally because they still apply to the session hypercube.
             useEffect(() => {
-                if (!app || !rowField || !textField || !sourceField || !activeSourceId) {
+                // No single source active — reset states and do nothing.
+                if (!activeSourceId) {
                     setOverrideScript(null);
+                    setOverrideFetchBlocked(false);
                     return undefined;
                 }
+
+                // Prerequisites unavailable (app or field names missing) — signal
+                // "blocked" so the UI renders a placeholder instead of spinning.
+                if (!app || !rowField || !textField || !sourceField) {
+                    logger.warn('Override fetch prerequisites missing:', {
+                        app: !!app,
+                        rowField,
+                        textField,
+                        sourceField,
+                    });
+                    setOverrideScript(null);
+                    setOverrideFetchBlocked(true);
+                    return undefined;
+                }
+
+                // Prerequisites met — reset to "loading" state before starting fetch.
+                setOverrideFetchBlocked(false);
+                setOverrideScript(null);
 
                 let cancelled = false;
                 let sessionModel = null;
@@ -179,14 +199,39 @@ export default function supernova(_galaxy) {
                 /**
                  * Find the active source row in the session hypercube layout
                  * and update overrideScript with its measure value.
+                 * Keeps the override in a loading state (null) when the
+                 * expected row is not yet present instead of treating it as
+                 * an empty script.
                  *
                  * @param {object} l - Session-object layout.
+                 * @returns {void}
                  */
                 const handleLayout = (l) => {
                     if (cancelled) return;
-                    const matrix = l?.qHyperCube?.qDataPages?.[0]?.qMatrix || [];
+
+                    const matrix = l?.qHyperCube?.qDataPages?.[0]?.qMatrix;
+                    if (!Array.isArray(matrix)) {
+                        logger.warn('Override session layout missing expected hypercube matrix:', {
+                            activeSourceId,
+                            layout: l,
+                        });
+                        setOverrideScript(null);
+                        return;
+                    }
+
                     const row = matrix.find((r) => r[0]?.qText === activeSourceId);
-                    setOverrideScript(row?.[1]?.qText ?? '');
+                    if (!row) {
+                        logger.warn(
+                            'Active source row not present in override session hypercube matrix:',
+                            {
+                                activeSourceId,
+                            }
+                        );
+                        setOverrideScript(null);
+                        return;
+                    }
+
+                    setOverrideScript(row[1]?.qText ?? '');
                 };
 
                 app.createSessionObject(def)
@@ -299,7 +344,7 @@ export default function supernova(_galaxy) {
 
                 // Exactly one source. Wait for the set-analysis override
                 // hypercube to deliver the full script for that source.
-                if (overrideScript === null) {
+                if (overrideScript === null && !overrideFetchBlocked) {
                     renderLoading(element);
                     return;
                 }
@@ -329,7 +374,7 @@ export default function supernova(_galaxy) {
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
-            }, [layout, element, activeIds, overrideScript, bnfReady]);
+            }, [layout, element, activeIds, overrideScript, overrideFetchBlocked, bnfReady]);
         },
     };
 }
@@ -493,8 +538,9 @@ async function fetchActiveIdentifiers(layout, model) {
 
     // ── Step 2: page through getHyperCubeData until >1 ID or all rows read ──
     // getHyperCubeData has a PAGE_SIZE-cell limit (qWidth × qHeight).
+    // Start from rowsSeen to avoid re-fetching rows already scanned above.
     const maxRowsPerPage = Math.floor(PAGE_SIZE / colCount);
-    let top = 0;
+    let top = rowsSeen;
     try {
         while (top < totalRows) {
             const height = Math.min(totalRows - top, maxRowsPerPage);
