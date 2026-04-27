@@ -14,6 +14,7 @@ import {
     useLayout,
     useEffect,
     useModel,
+    useApp,
     useState,
     onContextMenu,
 } from '@nebula.js/stardust';
@@ -58,6 +59,7 @@ export default function supernova(_galaxy) {
         component() {
             const layout = useLayout();
             const model = useModel();
+            const app = useApp();
             const element = useElement();
 
             /**
@@ -68,6 +70,11 @@ export default function supernova(_galaxy) {
             const [rawRows, setRawRows] = useState(null);
             const [activeIds, setActiveIds] = useState(null);
             const [bnfReady, setBnfReady] = useState(false);
+            // Full script for the currently active source, fetched via a
+            // secondary session hypercube whose measure uses set analysis
+            // to ignore selections in the script-text field (Dim 2).
+            // null when no single source is active or the fetch is pending.
+            const [overrideScript, setOverrideScript] = useState(null);
 
             useEffect(() => {
                 logger.info(`QvsView.qs v${PACKAGE_VERSION} (${BUILD_DATE})`);
@@ -117,6 +124,119 @@ export default function supernova(_galaxy) {
                     setActiveIds(null);
                 }
             }, [layout, model]);
+
+            // Discover the three configured field names from layout. Used as
+            // primitive deps for the override-fetch effect below so that the
+            // session hypercube is recreated only when field names change,
+            // not on every selection-driven layout update.
+            const dimInfo = layout?.qHyperCube?.qDimensionInfo;
+            const rowField = dimInfo?.[0]?.qGroupFieldDefs?.[0] || null;
+            const textField = dimInfo?.[1]?.qGroupFieldDefs?.[0] || null;
+            const sourceField = dimInfo?.[2]?.qGroupFieldDefs?.[0] || null;
+            const activeSourceId = activeIds && activeIds.length === 1 ? activeIds[0] : null;
+
+            // Fetch the FULL script for the currently active source via a
+            // secondary session hypercube whose measure uses set analysis to
+            // ignore selections in the script-text field (Dim 2). This is what
+            // gives the user the "single-source = full script even with a
+            // Dim-2 selection" behaviour. All other selections are honored
+            // naturally because they still apply to the session hypercube.
+            useEffect(() => {
+                if (!app || !rowField || !textField || !sourceField || !activeSourceId) {
+                    setOverrideScript(null);
+                    return undefined;
+                }
+
+                let cancelled = false;
+                let sessionModel = null;
+                let changedHandler = null;
+
+                const def = {
+                    qInfo: { qType: 'qvs-script-override' },
+                    qHyperCubeDef: {
+                        qDimensions: [
+                            {
+                                qDef: {
+                                    qFieldDefs: [`[${sourceField}]`],
+                                    qSortCriterias: [{ qSortByAscii: 1 }],
+                                },
+                            },
+                        ],
+                        qMeasures: [
+                            {
+                                qDef: {
+                                    qDef: `=Concat({<[${textField}]=>} [${textField}], Chr(10), [${rowField}])`,
+                                },
+                            },
+                        ],
+                        qInitialDataFetch: [{ qTop: 0, qLeft: 0, qWidth: 2, qHeight: 1000 }],
+                    },
+                };
+
+                /**
+                 * Find the active source row in the session hypercube layout
+                 * and update overrideScript with its measure value.
+                 *
+                 * @param {object} l - Session-object layout.
+                 */
+                const handleLayout = (l) => {
+                    if (cancelled) return;
+                    const matrix = l?.qHyperCube?.qDataPages?.[0]?.qMatrix || [];
+                    const row = matrix.find((r) => r[0]?.qText === activeSourceId);
+                    setOverrideScript(row?.[1]?.qText ?? '');
+                };
+
+                app.createSessionObject(def)
+                    .then(async (m) => {
+                        if (cancelled) {
+                            app.destroySessionObject(m.id).catch(() => {
+                                /* ignore */
+                            });
+                            return;
+                        }
+                        sessionModel = m;
+                        try {
+                            const l = await m.getLayout();
+                            handleLayout(l);
+                        } catch (e) {
+                            logger.warn('Override session getLayout failed:', e);
+                        }
+                        /**
+                         * Re-read the session-object layout when the engine
+                         * notifies us of a change (e.g. selections changed in
+                         * a non-ignored field, or initial pages arrived).
+                         */
+                        changedHandler = async () => {
+                            try {
+                                const ll = await m.getLayout();
+                                handleLayout(ll);
+                            } catch (e) {
+                                logger.warn('Override session changed-layout failed:', e);
+                            }
+                        };
+                        m.on('changed', changedHandler);
+                    })
+                    .catch((err) => {
+                        logger.warn('Failed to create override session hypercube:', err);
+                        if (!cancelled) setOverrideScript(null);
+                    });
+
+                return () => {
+                    cancelled = true;
+                    if (sessionModel) {
+                        if (changedHandler && typeof sessionModel.removeListener === 'function') {
+                            try {
+                                sessionModel.removeListener('changed', changedHandler);
+                            } catch {
+                                /* ignore */
+                            }
+                        }
+                        app.destroySessionObject(sessionModel.id).catch(() => {
+                            /* ignore */
+                        });
+                    }
+                };
+            }, [app, rowField, textField, sourceField, activeSourceId]);
 
             // Add "Copy selected text" to the right-click context menu
             onContextMenu((menu) => {
@@ -173,13 +293,22 @@ export default function supernova(_galaxy) {
                     return;
                 }
 
-                // Filter raw rows by the active identifier when second dim is present
-                let filteredRows = rawRows;
-                if (activeIds && activeIds.length === 1) {
-                    filteredRows = rawRows.filter((r) => r.id === activeIds[0]);
+                // When a single source is active, prefer the override script
+                // returned by the secondary set-analysis hypercube (which ignores
+                // selections in the script-text field). Fall back to the
+                // selection-aware rawRows for the brief moment before the
+                // override fetch resolves, and for the no-source-selected case.
+                let script;
+                if (activeIds && activeIds.length === 1 && overrideScript !== null) {
+                    script = overrideScript;
+                } else if (activeIds && activeIds.length === 1) {
+                    script = rawRows
+                        .filter((r) => r.id === activeIds[0])
+                        .map((r) => r.text)
+                        .join('\n');
+                } else {
+                    script = rawRows.map((r) => r.text).join('\n');
                 }
-
-                const script = filteredRows.map((r) => r.text).join('\n');
                 if (!script) {
                     renderPlaceholder(element);
                     return;
@@ -204,7 +333,7 @@ export default function supernova(_galaxy) {
                     aiConfig: aiEnabled ? aiOpts : null,
                     onAiAnalyze: aiEnabled ? (info) => handleAiAnalyze(info, aiOpts) : null,
                 });
-            }, [layout, element, rawRows, activeIds, bnfReady]);
+            }, [layout, element, rawRows, activeIds, overrideScript, bnfReady]);
         },
     };
 }
