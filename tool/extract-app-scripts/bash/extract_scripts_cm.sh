@@ -229,14 +229,17 @@ extract_app_script() {
     log_info "Extracted: $app_name -> $output_path"
 }
 
-# === Parser: Extract app ID and name from QRS JSON response ===
+# === Parser: Extract app ID, name, stream ID, and stream name from QRS JSON response ===
+# Output format: tab-separated fields (id\tname\tstream_id\tstream_name) — one app per line.
+# Using tabs as the field separator avoids breakage when app/stream names contain pipe characters.
+# jq @tsv escapes any literal tabs/newlines/backslashes within field values.
 parse_app_entries() {
     local json="$1"
 
     # Prefer jq if available, fallback to grep
     if command -v jq &>/dev/null; then
         local result
-        result=$(jq -r '.[] | "\(.id)|\(.name)"' <<< "$json" 2>&1)
+        result=$(jq -r '.[] | [.id, .name, (if .stream then .stream.id else "" end), (if .stream then .stream.name else "" end)] | @tsv' <<< "$json" 2>&1)
         local jq_status=$?
 
         if [[ $jq_status -eq 0 && -n "$result" ]]; then
@@ -246,8 +249,10 @@ parse_app_entries() {
             echo ""
         fi
     else
+        # Fallback: extract id and name only (stream info requires jq); empty stream fields appended
+        # for field-count consistency. Uses tab as field separator.
         local entries
-        entries=$(echo "$json" | grep -oE '"id":"[a-f0-9-]{36}"[^}]*"name":"[^"]*"' | sed -E 's/"id":"([a-f0-9-]{36})"[^}]*"name":"([^"]*)"/\1|\2/g')
+        entries=$(echo "$json" | grep -oE '"id":"[a-f0-9-]{36}"[^}]*"name":"[^"]*"' | sed -E 's/"id":"([a-f0-9-]{36})"[^}]*"name":"([^"]*)"/\1\t\2\t\t/g')
         echo "$entries"
     fi
 }
@@ -303,7 +308,7 @@ main() {
 
     log_info "Processing apps..."
 
-    while IFS='|' read -r app_id app_name; do
+    while IFS=$'\t' read -r app_id app_name stream_id stream_name; do
         [[ -z "$app_id" ]] && continue
 
         if [[ -z "$app_name" ]]; then
@@ -335,8 +340,8 @@ main() {
 
     # Create app_mapping.csv for traceability
     local csv_file="$output_folder/app_mapping.csv"
-    echo "app_id,app_name,file_name" > "$csv_file"
-    while IFS='|' read -r csv_app_id csv_app_name; do
+    echo "app_id,app_name,stream_id,stream_name,file_name" > "$csv_file"
+    while IFS=$'\t' read -r csv_app_id csv_app_name csv_stream_id csv_stream_name; do
         [[ -z "$csv_app_id" ]] && continue
         if [[ -z "$csv_app_name" ]]; then
             csv_app_name="app_$csv_app_id"
@@ -347,7 +352,19 @@ main() {
         csv_safe_app_name=$(echo "$csv_app_name" | sed 's/[\/\\:*?"<>|]/_/g' | cut -c1-150)
         local csv_file_name="${csv_safe_app_name}_${csv_app_id}.qvs"
 
-        echo "\"$csv_app_id\",\"$csv_app_name\",\"$csv_file_name\"" >> "$csv_file"
+        # Escape embedded double-quotes for valid CSV (RFC 4180: " → "")
+        local csv_app_id_escaped=${csv_app_id//\"/\"\"}
+        local csv_app_name_escaped=${csv_app_name//\"/\"\"}
+        local csv_stream_id_escaped=${csv_stream_id//\"/\"\"}
+        local csv_stream_name_escaped=${csv_stream_name//\"/\"\"}
+        local csv_file_name_escaped=${csv_file_name//\"/\"\"}
+
+        printf '"%s","%s","%s","%s","%s"\n' \
+            "$csv_app_id_escaped" \
+            "$csv_app_name_escaped" \
+            "$csv_stream_id_escaped" \
+            "$csv_stream_name_escaped" \
+            "$csv_file_name_escaped" >> "$csv_file"
     done <<< "$entries"
 
     if [[ "$ENABLE_LATEST_FOLDER" == "true" ]]; then

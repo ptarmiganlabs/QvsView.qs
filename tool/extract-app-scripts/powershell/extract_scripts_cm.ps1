@@ -239,7 +239,9 @@ function Extract-AppScript {
     return $true
 }
 
-# === Parser: Extract app ID and name from QRS JSON response ===
+# === Parser: Extract app ID, name, stream ID, and stream name from QRS JSON response ===
+# Returns an array of PSCustomObject with AppId, AppName, StreamId, StreamName properties,
+# avoiding any string-delimiter fragility when names contain special characters.
 function Parse-AppEntries {
     param([string]$Json)
 
@@ -247,13 +249,18 @@ function Parse-AppEntries {
         $apps = $Json | ConvertFrom-Json
         $result = @()
         foreach ($app in $apps) {
-            $result += "$($app.id)|$($app.name)"
+            $result += [PSCustomObject]@{
+                AppId      = [string]$app.id
+                AppName    = [string]$app.name
+                StreamId   = if ($app.stream) { [string]$app.stream.id } else { "" }
+                StreamName = if ($app.stream) { [string]$app.stream.name } else { "" }
+            }
         }
-        return $result -join "`n"
+        return $result
     }
     catch {
         Write-LogWarn "JSON parsing failed: $_"
-        return ""
+        return @()
     }
 }
 
@@ -303,19 +310,13 @@ function Main {
     # Process each app
     $totalExtracted = 0
     $totalFailed = 0
-    $entries = Parse-AppEntries -Json $appsJson
+    $appEntries = Parse-AppEntries -Json $appsJson
 
     Write-LogInfo "Processing apps..."
 
-    $entriesArray = $entries -split "`n"
-    foreach ($entry in $entriesArray) {
-        if (-not $entry) { continue }
-
-        $parts = $entry -split '\|'
-        if ($parts.Count -lt 2) { continue }
-
-        $appId = $parts[0].Trim()
-        $appName = $parts[1].Trim()
+    foreach ($appEntry in $appEntries) {
+        $appId = $appEntry.AppId
+        $appName = $appEntry.AppName
 
         if (-not $appId) { continue }
         if (-not $appName) { $appName = "app_$appId" }
@@ -348,13 +349,12 @@ function Main {
 
     # Create app_mapping.csv for traceability
     $csvFile = Join-Path $outputFolder "app_mapping.csv"
-    "app_id,app_name,file_name" | Out-File -FilePath $csvFile -Encoding UTF8
-    foreach ($entry in $entriesArray) {
-        if (-not $entry) { continue }
-        $parts = $entry -split '\|'
-        if ($parts.Count -lt 2) { continue }
-        $appId = $parts[0].Trim()
-        $appName = $parts[1].Trim()
+    "app_id,app_name,stream_id,stream_name,file_name" | Out-File -FilePath $csvFile -Encoding UTF8
+    foreach ($appEntry in $appEntries) {
+        $appId = $appEntry.AppId
+        $appName = $appEntry.AppName
+        $csvStreamId = $appEntry.StreamId
+        $csvStreamName = $appEntry.StreamName
         if (-not $appId) { continue }
         if (-not $appName) { $appName = "app_$appId" }
 
@@ -363,7 +363,14 @@ function Main {
         if ($csvSafeAppName.Length -gt 150) { $csvSafeAppName = $csvSafeAppName.Substring(0, 150) }
         $csvFileName = "$csvSafeAppName`_$appId.qvs"
 
-        "`"$appId`",`"$appName`",`"$csvFileName`"" | Out-File -FilePath $csvFile -Append -Encoding UTF8
+        # Escape embedded double-quotes for valid CSV (RFC 4180: " → "")
+        $csvEscapedAppId = $appId -replace '"', '""'
+        $csvEscapedAppName = $appName -replace '"', '""'
+        $csvEscapedStreamId = $csvStreamId -replace '"', '""'
+        $csvEscapedStreamName = $csvStreamName -replace '"', '""'
+        $csvEscapedFileName = $csvFileName -replace '"', '""'
+
+        "`"$csvEscapedAppId`",`"$csvEscapedAppName`",`"$csvEscapedStreamId`",`"$csvEscapedStreamName`",`"$csvEscapedFileName`"" | Out-File -FilePath $csvFile -Append -Encoding UTF8
     }
 
     if ($ENABLE_LATEST_FOLDER) {

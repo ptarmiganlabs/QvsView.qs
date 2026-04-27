@@ -82,7 +82,7 @@ pwsh ./extract_scripts_cm.ps1
 ```
 output/
 ├── 2026-04-25_120000/              # Timestamped folder
-│   ├── app_mapping.csv              # appId, appName, file_name
+│   ├── app_mapping.csv              # app_id, app_name, stream_id, stream_name, file_name
 │   ├── App_1_abc123.qvs
 │   ├── App_2_def456.qvs
 │   └── ...
@@ -141,6 +141,8 @@ Apps:
 LOAD
     app_id as [App ID],
     app_name as [App name],
+    stream_id as [Stream ID],
+    stream_name as [Stream name],
     file_name as [File name]
 FROM [lib://Scripts data connection/path/to/qvs/files/app_mapping.csv]
 (txt, utf8, embedded labels, delimiter is ',', msq);

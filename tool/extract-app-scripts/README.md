@@ -117,7 +117,7 @@ tool/extract-app-scripts/
 ```
 output/
 ├── 2026-04-18_143052/              # Timestamped folder
-│   ├── app_mapping.csv             # appId, appName, file_name mapping
+│   ├── app_mapping.csv             # app_id, app_name, stream_id, stream_name, file_name
 │   ├── App1_id.qvs
 │   ├── App2_id.qvs
 │   └── ...
@@ -131,9 +131,12 @@ output/
 
 The `app_mapping.csv` file provides a complete traceback between Qlik Sense applications and the extracted files:
 
-| app_id        | app_name      | file_name                     |
-| ------------- | ------------- | ----------------------------- |
-| `79f610f2...` | `My App Name` | `My_App_Name_79f610f2....qvs` |
+| app_id        | app_name      | stream_id     | stream_name | file_name                     |
+| ------------- | ------------- | ------------- | ----------- | ----------------------------- |
+| `79f610f2...` | `My App Name` | `046b6c7f...` | `My Stream` | `My_App_Name_79f610f2....qvs` |
+| `a1b2c3d4...` | `Unpublished` |               |             | `Unpublished_a1b2c3d4....qvs` |
+
+Apps that are not published to a stream have empty `stream_id` and `stream_name` values.
 
 ## Flow
 
