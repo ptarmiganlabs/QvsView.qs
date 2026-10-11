@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.7.1...qvsview-qs-v0.7.2) (2026-10-11)
+
+
+### Miscellaneous
+
+* run release-please-action v5.0.0, which can tag a draft ([ca55b67](https://github.com/ptarmiganlabs/QvsView.qs/commit/ca55b671fa85a8f88f6c407ca0827ea41d6bb938))
+* tag each release when release-please creates its draft ([2a1ad28](https://github.com/ptarmiganlabs/QvsView.qs/commit/2a1ad28cae378a2cbc21542f7d93b95b246797e2))
+
 ## [0.7.1](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.7.0...qvsview-qs-v0.7.1) (2026-04-27)
 
 
