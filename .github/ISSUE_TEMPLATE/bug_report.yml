@@ -1,0 +1,118 @@
+name: Bug report
+description: Something in QvsView.qs doesn't work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. The extension's version and variant are at the bottom of its property panel, under **About**.
+
+        Questions go to [Discussions](https://github.com/ptarmiganlabs/QvsView.qs/discussions/categories/q-a) instead.
+
+        This issue is public: leave out script contents, server names and anything else you can't share. **Never paste an AI provider's API key.**
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, and what the viewer showed. A warning or error it showed, word for word, helps most. A screenshot is welcome, if it shows nothing you can't share.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: The steps, from opening the sheet. Say which section tab, button or setting is involved.
+      placeholder: |
+        1. Open the "Main" section tab
+        2. Search for "Peek(" with Ctrl+F
+        3. ...
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the viewer
+      options:
+        - Showing the script (data, sections, large scripts)
+        - Syntax highlighting
+        - Section tabs, search or code folding
+        - Copy to clipboard
+        - AI script analysis
+        - Property panel
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: extension-version
+    attributes:
+      label: QvsView.qs version
+      description: In the property panel, under About, such as "QvsView.qs v0.7.1".
+      placeholder: "0.7.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: variant
+    attributes:
+      label: Variant
+      description: Also under About, or in the name of the zip file you installed.
+      options:
+        - CDN (light)
+        - Air-gapped (full)
+        - Don't know
+    validations:
+      required: true
+  - type: dropdown
+    id: sense-edition
+    attributes:
+      label: Qlik Sense edition
+      options:
+        - Qlik Sense Enterprise on Windows (client-managed)
+        - Qlik Cloud
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: sense-version
+    attributes:
+      label: Qlik Sense version
+      description: For client-managed Qlik Sense, the release, such as May 2025 Patch 3. Leave it empty for Qlik Cloud.
+      placeholder: "May 2025 Patch 3"
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and operating system
+      placeholder: "Chrome 142 on Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: The script data
+      description: The object's dimensions, and roughly how long the script is. Say whether the data holds one app's script or several.
+      placeholder: |
+        Dimensions: ScriptRow, AppName
+        One app, about 4,000 lines in 12 sections
+  - type: textarea
+    id: ai
+    attributes:
+      label: AI analysis, if that's where it fails
+      description: The provider (Ollama, OpenAI or Anthropic), the model, and the prompt template. For Ollama, where it runs, such as on the same machine or on a server.
+      placeholder: |
+        Anthropic, claude-sonnet-5-5, Security template
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console lines
+      description: "Open the browser's developer tools (F12, or Cmd+Option+I on a Mac), go to the Console tab, and paste the lines that start with **QvsView.qs**. Remove anything you can't share."
+      render: text
+  - type: checkboxes
+    id: public
+    attributes:
+      label: Before you send it
+      options:
+        - label: I've left out script contents, server names and API keys I can't share, because this issue is public
+          required: true
