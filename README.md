@@ -177,7 +177,7 @@ Built with [nebula.js](https://qlik.dev/toolkits/nebulajs/) and bundled as a sin
 Pull requests are welcome!
 
 1. Fork the repository and create a feature branch.
-2. Run `npm run lint:fix && npm run format` before committing.
+2. Run `npm run lint:fix && npm run format && npm test` before committing.
 3. Use [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `docs:`, `refactor:`, etc.
 4. Open a pull request against `main`.
 

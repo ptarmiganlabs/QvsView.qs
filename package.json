@@ -32,11 +32,12 @@
     "scripts": {
         "build": "cross-env BUILD_TYPE=development nebula build --config nebula.config.cjs --sourcemap false --mode development",
         "build:dist": "cross-env BUILD_TYPE=production nebula build --config nebula.config.cjs --sourcemap false",
-        "lint": "eslint src scripts",
-        "lint:fix": "eslint src scripts --fix",
+        "lint": "eslint src scripts test",
+        "lint:fix": "eslint src scripts test --fix",
         "format": "prettier --write \"./**/*.{js,mjs,css,json,yaml,md}\"",
         "format:check": "prettier --check \"./**/*.{js,mjs,css,json,yaml,md}\"",
-        "start": "nebula serve",
+        "test": "node --test \"test/**/*.test.mjs\"",
+        "start": "nebula serve --config nebula.config.cjs",
         "sense": "nebula sense --meta src/meta.json",
         "post-build": "node scripts/post-build.mjs",
         "generate-pdf": "node scripts/generate-readme-pdf.mjs",
@@ -56,7 +57,6 @@
         "@nebula.js/cli-build": "^6.8.0",
         "@nebula.js/cli-sense": "^6.8.0",
         "@nebula.js/cli-serve": "^6.7.0",
-        "@rollup/plugin-replace": "^6.0.2",
         "archiver": "^7.0.1",
         "cross-env": "^10.1.0",
         "eslint": "^10.2.1",
@@ -80,6 +80,9 @@
             "eslint --fix"
         ],
         "scripts/**/*.{js,mjs,cjs}": [
+            "eslint --fix"
+        ],
+        "test/**/*.{js,mjs,cjs}": [
             "eslint --fix"
         ]
     }

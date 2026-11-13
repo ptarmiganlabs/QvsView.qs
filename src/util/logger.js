@@ -1,6 +1,14 @@
 /**
- * Logger utility with build-type awareness.
- * Production builds suppress debug output.
+ * Logger utility with build-type awareness, and the build information the
+ * extension shows.
+ *
+ * The four constants below read build tokens. nebula's Rollup replace plugin
+ * puts each token's value in its place while it bundles, from
+ * `replacementStrings` in nebula.config.cjs (scripts/build-tokens.cjs), so the
+ * bundle holds string literals, not the tokens. Rollup and terser can then
+ * fold what depends on them: `IS_PRODUCTION` is a constant, so `debug()` logs
+ * nothing in a production build, and code that only the other build variant
+ * uses (see src/ai/mermaid-init.js) is left out of the bundle.
  */
 
 /** @type {string} */

@@ -10,6 +10,7 @@ At the start of each session, read: `README.md` and `docs/*.md` for architecture
 
 ```bash
 npm run lint:fix      # Fix lint errors
+npm test              # Guard tests (node:test)
 npm run format        # Format code
 npm run pack:dev      # Dev build + zip
 npm run pack:prod     # Production build + zip
@@ -47,7 +48,8 @@ QvsView.qs/
 │   └── ai-analysis.md
 ├── scripts/                      # Build utilities
 │   ├── build-date.cjs
-│   ├── post-build.mjs
+│   ├── build-tokens.cjs          # Build token names and values
+│   ├── post-build.mjs            # Fails on a token left; Mermaid copy; .qext bundle metadata
 │   └── zip-extension.mjs
 ├── src/
 │   ├── ext/                      # Property panel
@@ -67,6 +69,8 @@ QvsView.qs/
 │   ├── meta.json                 # Extension metadata
 │   ├── object-properties.js      # Default properties
 │   └── style.css                 # Viewer styles
+├── test/
+│   └── nebula-config.test.mjs    # Guard test for nebula.config.cjs
 ├── AGENTS.md
 ├── eslint.config.js
 ├── nebula.config.cjs
@@ -84,7 +88,16 @@ QvsView.qs/
 
 ## Quality Gates (required before commit)
 
-Run in order: `npm run lint:fix` → `npm run format` → verify build works
+Run in order: `npm run lint:fix` → `npm run format` → `npm test` → verify build works
+
+## Build Tokens
+
+- `__BUILD_TYPE__`, `__PACKAGE_VERSION__`, `__BUILD_DATE__`, `__BUILD_VARIANT__` — names and values in `scripts/build-tokens.cjs`
+- nebula replaces them from `build.replacementStrings` in `nebula.config.cjs`, before terser minifies. nebula reads no other key there, and no `rollup()` hook
+- Every `nebula build` / `nebula serve` script passes `--config nebula.config.cjs`; without it nebula builds with no options
+- `scripts/post-build.mjs` replaces nothing: it fails when a token is left in a `.js` file, or when `dist/` holds no bundle
+- A token name in a source comment is replaced too, so name a token in a comment only where that is harmless
+- House rule: `rules/scaffolding/nebula-config.md` in ptarmiganlabs/plabs-house-rules
 
 ## JSDoc
 

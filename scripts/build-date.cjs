@@ -1,6 +1,6 @@
 /**
- * Shared build-date utility for use by nebula.config.cjs (CJS) and
- * scripts/post-build.mjs (ESM via createRequire).
+ * Build-date utility for scripts/build-tokens.cjs, which nebula.config.cjs
+ * requires: the date becomes the `__BUILD_DATE__` build token.
  */
 
 /**
