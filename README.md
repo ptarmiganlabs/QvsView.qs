@@ -1,4 +1,19 @@
-# QvsView.qs
+<h1 align="center">QvsView.qs</h1>
+
+<p align="center"><strong>Read-only Qlik load script viewer with syntax highlighting</strong></p>
+
+<p align="center">
+<a href="https://github.com/ptarmiganlabs/QvsView.qs/releases"><img src="https://img.shields.io/github/v/release/ptarmiganlabs/QvsView.qs?include_prereleases" alt="Latest release"></a>
+<a href="https://github.com/ptarmiganlabs/QvsView.qs/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
+<a href="https://github.com/sponsors/ptarmiganlabs"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors" alt="Sponsor Ptarmigan Labs on GitHub"></a>
+</p>
+
+<p align="center">
+<a href="#getting-started">Getting started</a> ·
+<a href="https://github.com/ptarmiganlabs/QvsView.qs/discussions">Questions</a> ·
+<a href="https://github.com/ptarmiganlabs/QvsView.qs/issues">Report a bug</a> ·
+<a href="https://github.com/sponsors/ptarmiganlabs">❤️ Sponsor</a>
+</p>
 
 Read-only Qlik load script viewer with syntax highlighting — add it to any Qlik Sense sheet to display a field containing app load scripts in a formatted, color-coded code viewer.
 
@@ -6,16 +21,18 @@ Primarily intended for use with **Qlik Sense Enterprise on Windows** (client-man
 
 ## ❤️ Support the project
 
-If you find this project helpful and use it in your Qlik Sense environment, please consider supporting it financially! Your sponsorship helps ensure the project's long-term sustainability and allows me to continue maintaining it, fixing bugs, and adding new features.
+QvsView.qs is free and open source, under the MIT licence. If you use it, please consider sponsoring its development: sponsorships pay for maintenance, bug fixes and new features, and keep the project going.
 
-**👉 [Sponsor the project on GitHub](https://github.com/sponsors/ptarmiganlabs)** — click the "Sponsor" button at the repository page to become a sponsor.
+**[❤️ Sponsor Ptarmigan Labs on GitHub](https://github.com/sponsors/ptarmiganlabs)**
 
-- ⭐ **Star the repository** on GitHub — it helps others discover the project
-- 🍴 **Fork and contribute** — pull requests are welcome!
-- 💬 **Share your feedback** — let me know how you're using it
-- 🐛 **Report issues** — help improve stability and functionality
+Other ways to help:
 
-_This project is maintained by [Göran Sander](https://github.com/mountaindude) and supported by [Ptarmigan Labs](https://ptarmiganlabs.com)._
+- ⭐ **Star the repository**: it helps others find the project.
+- 💬 **Share your feedback** in [Discussions](https://github.com/ptarmiganlabs/QvsView.qs/discussions): tell us how you use it.
+- 🐛 **Report issues** in [Issues](https://github.com/ptarmiganlabs/QvsView.qs/issues).
+- 🍴 **Contribute**: pull requests are welcome.
+
+_Maintained by [Göran Sander](https://github.com/mountaindude) and supported by [Ptarmigan Labs](https://ptarmiganlabs.com)._
 
 ---
 
