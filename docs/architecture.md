@@ -562,7 +562,8 @@ unmounts.
 flowchart LR
     SRC[src/**] --> ROLLUP[Rollup<br/>UMD bundle]
     ROLLUP --> DIST[dist/]
-    DIST --> POST[scripts/post-build.mjs]
+    TOKENS[scripts/build-tokens.cjs<br/>replacementStrings] --> ROLLUP
+    DIST --> POST[scripts/post-build.mjs<br/>fails on a token left]
     POST --> EXTDIR[qvsview-qs-ext/<br/>folder layout]
     META[src/meta.json] --> POST
     EXTDIR --> ZIP[scripts/zip-extension.mjs]
@@ -577,7 +578,31 @@ npm run format        # prettier
 npm run pack:dev      # dev build + zip
 npm run pack:prod     # production build + zip
 npm run start         # nebula dev server (no Qlik needed)
+npm test              # guard test for nebula.config.cjs (node:test)
 ```
+
+**Build tokens.** `src/util/logger.js` and `src/ai/mermaid-init.js` read
+`__BUILD_TYPE__`, `__PACKAGE_VERSION__`, `__BUILD_DATE__` and
+`__BUILD_VARIANT__` as bare names. Their values come from
+`scripts/build-tokens.cjs`; `nebula.config.cjs` hands them to nebula as
+`build.replacementStrings`, and nebula's own Rollup replace plugin puts them in
+place before terser minifies. With real values in the source, Rollup and terser
+fold what depends on them: the About section's variant label is a literal, and
+each variant's bundle holds only the Mermaid loader it uses. nebula reads only
+its own options from `nebula.config.cjs` and ignores any other key without a
+word, so `test/nebula-config.test.mjs` fails on a key nebula does not read, on a
+token nebula's pipeline leaves, and on a `nebula build` / `nebula serve` script
+without `--config nebula.config.cjs`.
+
+`scripts/post-build.mjs` runs after `nebula build` and `nebula sense` for both
+variants (`pack:*` and `pack:*:airgap`). It replaces no token: it fails when a
+token is left in any `.js` file in `dist/` or `qvsview-qs-ext/`, or when either
+holds no `.js` file. It also copies `mermaid.min.js` into the extension folder
+for the air-gapped variant (and removes it otherwise), and injects the bundle
+metadata into the `.qext`. `nebula sense` does not rebuild the bundle: it copies
+it into the extension folder and writes a one-line AMD stub beside it, which
+holds no token. `npm start` runs no post-build step, so for the dev server the
+`--config` flag is the only thing that gets the tokens replaced.
 
 Build artefacts (`dist/`, `qvsview-qs-ext/`, `qvsview-qs.zip`) must not be
 edited by hand — they're regenerated.

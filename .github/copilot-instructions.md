@@ -20,6 +20,7 @@ When writing code, Copilot must not finish until all of these succeed:
 
 1. `npm run lint:fix`
 2. `npm run format`
+3. `npm test`
 
 If any check fails, fix the issues and run checks again.
 
@@ -56,7 +57,7 @@ If any check fails, fix the issues and run checks again.
 - No dynamic imports — UMD bundle must be single file
 - No runtime dependencies — extension is fully self-contained
 - Keywords are case-insensitive in Qlik script
-- Build-time tokens: `__BUILD_TYPE__`, `__PACKAGE_VERSION__`, `__BUILD_DATE__`
+- Build-time tokens: `__BUILD_TYPE__`, `__PACKAGE_VERSION__`, `__BUILD_DATE__`, `__BUILD_VARIANT__`. Names and values live in `scripts/build-tokens.cjs`; nebula replaces them from `build.replacementStrings` in `nebula.config.cjs`, and `scripts/post-build.mjs` fails on one left. `test/nebula-config.test.mjs` keeps the lists in step.
 - **Extension upload**: You cannot upload the extension zip to Qlik Sense yourself. After building, tell the user the zip is ready and wait for them to confirm the upload is done before testing.
 
 ## Coding Guidelines

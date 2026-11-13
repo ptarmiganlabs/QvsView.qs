@@ -10,7 +10,9 @@
  * - `full` (air-gapped variant) — loads mermaid.min.js from the extension folder.
  *   Larger bundle (~3 MB) but works in air-gapped environments.
  *
- * The active variant is set at build time via the `__BUILD_VARIANT__` token.
+ * The active variant is set at build time by the build-variant token that
+ * `BUILD_VARIANT` below reads (scripts/build-tokens.cjs). nebula replaces it
+ * while it bundles, so the bundle holds only the loader its variant uses.
  *
  * Pinned to an exact version to prevent unexpected breaking changes and
  * supply-chain risk from unpinned version tags.
@@ -20,7 +22,7 @@
 const MERMAID_VERSION = '11.14.0';
 
 /**
- * Build variant injected at compile time by Rollup.
+ * Build variant, replaced at build time by nebula's Rollup replace plugin.
  * `'light'` = CDN, `'full'` = bundled air-gapped.
  *
  * @constant {string}
