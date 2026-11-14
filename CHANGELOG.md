@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.2](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.7.1...qvsview-qs-v0.7.2) (2026-11-14)
+
+
+### Miscellaneous
+
+* add issue forms for bug reports and feature requests ([7516e60](https://github.com/ptarmiganlabs/QvsView.qs/commit/7516e6089aeb2a184bda7a985cd70e855bb90837))
+* replace build tokens through nebula's replacementStrings ([2cf5168](https://github.com/ptarmiganlabs/QvsView.qs/commit/2cf5168aee4a0c9a2d8fbd0ca6b875e53fae8d0c))
+* run release-please-action v5.0.0, which can tag a draft ([ca55b67](https://github.com/ptarmiganlabs/QvsView.qs/commit/ca55b671fa85a8f88f6c407ca0827ea41d6bb938))
+* tag each release when release-please creates its draft ([2a1ad28](https://github.com/ptarmiganlabs/QvsView.qs/commit/2a1ad28cae378a2cbc21542f7d93b95b246797e2))
+* use the organisation's default FUNDING.yml ([1331319](https://github.com/ptarmiganlabs/QvsView.qs/commit/13313198b69f23feef841c17b174516298cc513a))
+
+
+### Documentation
+
+* add sponsor section to README ([ceedff1](https://github.com/ptarmiganlabs/QvsView.qs/commit/ceedff13eb1e11979384e5349b23855f538e4092))
+* show the demo GIF under the README header ([ccd1aeb](https://github.com/ptarmiganlabs/QvsView.qs/commit/ccd1aebbc5c99a9ee0b0cb0193d0bbc37bea7fba))
+
 ## [0.7.1](https://github.com/ptarmiganlabs/QvsView.qs/compare/qvsview-qs-v0.7.0...qvsview-qs-v0.7.1) (2026-04-27)
 
 
