@@ -15,6 +15,10 @@
 <a href="https://github.com/sponsors/ptarmiganlabs">❤️ Sponsor</a>
 </p>
 
+<p align="center">
+  <img src="docs/img/qvsview-qs-analyze.gif" alt="QvsView.qs on a Qlik Sense sheet: a load script shown colour-coded, then Analyze with AI, and the answer with a diagram of the script" width="880">
+</p>
+
 Read-only Qlik load script viewer with syntax highlighting — add it to any Qlik Sense sheet to display a field containing app load scripts in a formatted, color-coded code viewer.
 
 Primarily intended for use with **Qlik Sense Enterprise on Windows** (client-managed). Also compatible with **Qlik Sense Cloud**, though the data pipeline for Cloud is more complex (see [docs/getting-started.md](docs/getting-started.md)).
